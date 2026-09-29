@@ -94,6 +94,33 @@ static void advance_command_timers(BoilerController *c, uint32_t dt_ms, const Bo
     c->state_time_ms = saturating_add(c->state_time_ms, dt_ms);
 }
 
+static void update_heatup(BoilerController *c, BoilerState previous_state, uint32_t dt_ms)
+{
+    const BoilerReading *temperature = &c->measurements.temperature_c;
+
+    if (c->state != BOILER_STATE_STARTUP && c->state != BOILER_STATE_RUNNING) {
+        c->heatup_monitoring = false;
+        c->heatup_elapsed_ms = 0;
+    } else if (previous_state == BOILER_STATE_STANDBY && c->state == BOILER_STATE_STARTUP) {
+        /* The accepting step ends at the transition; no earlier time belongs to heat-up. */
+        c->heatup_monitoring = true;
+        c->heatup_elapsed_ms = 0;
+    } else if (c->heatup_monitoring) {
+        const uint64_t elapsed = c->heatup_elapsed_ms;
+
+        c->heatup_elapsed_ms = elapsed > UINT64_MAX - dt_ms ? UINT64_MAX : elapsed + dt_ms;
+    }
+
+    /* Completion uses the newly applied setpoint and takes precedence over timeout. */
+    if (c->heatup_monitoring && temperature->valid && temperature->value >= c->setpoint_c) {
+        c->heatup_monitoring = false;
+    }
+    const bool timed_out =
+        c->heatup_monitoring && c->heatup_elapsed_ms > c->config.heatup_timeout_ms;
+
+    sp_alarms_update(&c->alarms, BOILER_FAULT_HEATUP_TIMEOUT, timed_out, false);
+}
+
 static uint8_t horn_required(const BoilerController *c)
 {
     return (c->alarms.unacked & c->alarms.active & BOILER_CRITICAL_FAULT_MASK) != 0;
@@ -108,6 +135,7 @@ void boiler_step(BoilerController *c, const BoilerInputs *inputs, const BoilerCo
     }
     const BoilerOutputs before = c->outputs;
     const BoilerCommanded commanded = commanded_view(c);
+    const BoilerState previous_state = c->state;
 
     c->measurements = boiler_measure(&c->config, inputs);
     boiler_faults_update(&c->fault_timers, &c->alarms, &c->config, &c->measurements, &commanded,
@@ -116,6 +144,7 @@ void boiler_step(BoilerController *c, const BoilerInputs *inputs, const BoilerCo
         sp_alarms_ack_all(&c->alarms);
     }
     boiler_sequence_step(c, commands, dt_ms);
+    update_heatup(c, previous_state, dt_ms);
     c->outputs.alarm_horn = horn_required(c);
     advance_command_timers(c, dt_ms, &before);
     *outputs = c->outputs;

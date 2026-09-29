@@ -63,7 +63,7 @@ def project(tmp_path):
           paths:
             requirements: [requirements/*.yaml]
             code: [src/*.c]
-            tests: [tests/*.c]
+            tests: [tests/*.c, tests/CMakeLists.txt]
             docs: [README.md]
           gates:
             - grep -q "x >= 10" app/src/limit.c
@@ -87,6 +87,27 @@ def test_code_task_context_holds_the_requirement_implementation_and_tests(projec
     assert "file app/src/limit.c (implements it)" in titles
     assert "file app/tests/test_limit.c (verifies it)" in titles
     assert "app/src/*.c" in user
+
+
+def test_requirement_tasks_see_the_file_that_defines_the_requirement(project):
+    _, context = build_request(project, TASKS["code"], "REQ-001", {}, CONFIG)
+
+    assert "file app/requirements/main.yaml (defines REQ-001)" in [t for t, _ in context.sections]
+
+
+def test_tests_task_sees_the_test_build_and_is_told_to_register_files(project):
+    (project.repo / "app/tests/CMakeLists.txt").write_text("sparrow_add_c_test(test_limit)\n")
+    harness = project.repo / "sparrow/testing/sp_test.h"
+    harness.parent.mkdir(parents=True)
+    harness.write_text("#define SP_TEST(name, reqs)\n")
+
+    user, context = build_request(project, TASKS["tests"], "REQ-001", {}, CONFIG)
+
+    titles = [t for t, _ in context.sections]
+    assert "file app/tests/CMakeLists.txt (test build)" in titles
+    assert "file sparrow/testing/sp_test.h (C test harness)" in titles
+    assert "never #include a .c file" in user
+    assert "sparrow_add_c_test" in user
 
 
 def test_unknown_requirement_is_rejected(project):
@@ -126,6 +147,7 @@ def test_proposal_is_validated_saved_and_not_applied_by_default(project):
     assert {p.suffix for p in outcome.saved} == {".patch", ".json"}
     assert "x > 10" in (project.repo / "app/src/limit.c").read_text()
     assert provider.calls[0][2]["required"] == ["summary", "rationale", "edits"]
+    assert outcome.usage == [("scripted", 0, 0)]
 
 
 def test_apply_and_verify_run_the_gates(project):

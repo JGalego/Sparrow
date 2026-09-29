@@ -25,6 +25,10 @@ typedef struct {
     uint32_t uptime_ms;
     float setpoint_c;
 
+    /* REQ-042: elapsed time since accepted start, independent of state timers. */
+    uint64_t heatup_elapsed_ms;
+    bool heatup_monitoring;
+
     BoilerMeasurements measurements;
     SpAlarmSet alarms;
     BoilerFaultTimers fault_timers;

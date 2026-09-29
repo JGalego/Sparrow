@@ -257,8 +257,9 @@ requirements:
   - id: REQ-017
     title: Shutdown sequence
     statement: >
-      On a stop request in STARTUP or RUNNING the controller shall enter
-      SHUTDOWN, open the heater contactor, keep the pump running and the
+      On a stop request in STARTUP or RUNNING the controller shall, in the
+      same control step, enter SHUTDOWN and open the heater contactor. It
+      shall keep the pump running and the
       valve open until the temperature is at or below cooldown_c, then enter
       STANDBY. Start requests in SHUTDOWN shall be ignored.
     component: controller
@@ -320,3 +321,35 @@ requirements:
     implementation:
       - controller/boiler_controller.c::boiler_config_validate
       - generated/boiler_model.c::boiler_config_check_ranges
+
+  - id: REQ-042
+    title: Heat-up timeout warning
+    statement: >
+      On accepting a start request in STANDBY, the controller shall begin
+      monitoring heat-up, measuring elapsed controller time from the transition
+      to STARTUP, including time spent in STARTUP and RUNNING. Heat-up shall
+      complete on the first control step with a valid temperature reading at
+      or above the active setpoint. If heat-up remains incomplete for more than
+      heatup_timeout_ms (default 1,200,000 ms, 20 minutes), the controller
+      shall raise a non-latching warning in that control step. It shall not
+      raise the warning at exactly heatup_timeout_ms. Completion shall take precedence over timeout when both
+      occur in the same step. An invalid temperature reading shall not count
+      as completion and shall not pause the timer. Setpoint changes shall
+      update the completion target without restarting the timer. The warning
+      shall clear on completion or on leaving STARTUP or RUNNING for any other
+      state. Once completed or cancelled, monitoring shall remain inactive
+      until another start request is accepted in STANDBY. This warning shall
+      not change the controller state or actuator commands.
+    rationale: >
+      Slow heat-up can indicate inadequate heater capacity or excessive heat
+      loss without requiring a shutdown. Including startup time detects an
+      excessively long wait for circulation as well as slow heating. Existing
+      critical faults and interlocks remain authoritative. The duration is the
+      configuration parameter heatup_timeout_ms (default 1200000 ms).
+    component: controller
+    priority: should
+    verification: test
+    parameters: [heatup_timeout_ms]
+    implementation:
+      - controller/boiler_controller.c::update_heatup
+      - controller/boiler_controller.c::boiler_step

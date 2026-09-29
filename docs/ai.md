@@ -171,6 +171,8 @@ sparrow ai review main       # branch against main
 
 Context: the diff and the requirements implemented by the files it touches. The report lists findings as `SEVERITY file:line [REQ]: text`. It reviews in addition to a person, not instead of one.
 
+[openai-walkthrough.md](openai-walkthrough.md) records one requirement taken through every stage with `gpt-6.1-sol`, including what failed.
+
 ## Proposals
 
 Proposal tasks reply with a JSON object: a summary, a rationale, and a list of edits. Each edit is either an exact search/replace in an existing file or the full content of a new file. Before anything is written, Sparrow checks that:
@@ -190,7 +192,7 @@ sparrow ai tests REQ-042 --apply      # write it to the working tree
 sparrow ai tests REQ-042 --verify     # write it, then run the gates
 ```
 
-`--verify` runs the `ai.gates` commands from the repository root and stops at the first failure. For the Smart Boiler these are `make gen`, `make lint` and `make test`. A proposal that fails a gate stays in the working tree for inspection. `git checkout -- .` discards it. The command exits non-zero if a gate fails.
+`--verify` runs the `ai.gates` commands from the repository root and stops at the first failure. For the Smart Boiler these are `make gen`, `make format` and `make trace`, which regenerate derived files, then `make lint` and `make test`. A proposal that fails a gate stays in the working tree for inspection. `git checkout -- .` discards it. The command exits non-zero if a gate fails.
 
 ## Testing
 

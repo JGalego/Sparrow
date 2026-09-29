@@ -294,6 +294,39 @@ SP_TEST(shutdown_circulates_until_the_boiler_has_cooled, "REQ-017")
     SP_ASSERT_EQ_INT(1, f.outputs.valve_open);
 }
 
+SP_TEST(stop_opens_the_heater_contactor_in_the_step_that_accepts_it, "REQ-017")
+{
+    BoilerFixture f = running_fixture();
+    fixture_set_temperature(&f, 60.0f);
+    fixture_step_following(&f, 300);
+    SP_ASSERT_EQ_INT(1, f.outputs.heater_contactor);
+    const BoilerCommands stop = {.stop = 1};
+
+    fixture_command(&f, stop);
+
+    SP_ASSERT_EQ_INT(BOILER_STATE_SHUTDOWN, f.status.state);
+    SP_ASSERT_EQ_INT(0, f.outputs.heater_contactor);
+    SP_ASSERT_NEAR(0.0, f.outputs.heater_power_pct, 0);
+    SP_ASSERT_EQ_INT(1, f.outputs.pump_run);
+    SP_ASSERT_EQ_INT(1, f.outputs.valve_open);
+}
+
+SP_TEST(stop_during_startup_takes_effect_in_the_same_step, "REQ-017")
+{
+    BoilerFixture f;
+    fixture_init(&f);
+    fixture_reach_standby(&f);
+    const BoilerCommands start = {.start = 1};
+    const BoilerCommands stop = {.stop = 1};
+    fixture_command(&f, start);
+    fixture_step_following(&f, 1000);
+
+    fixture_command(&f, stop);
+
+    SP_ASSERT_EQ_INT(BOILER_STATE_SHUTDOWN, f.status.state);
+    SP_ASSERT_EQ_INT(0, f.outputs.heater_contactor);
+}
+
 SP_TEST(shutdown_ends_at_the_cooldown_temperature, "REQ-017")
 {
     BoilerFixture f = running_fixture();

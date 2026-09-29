@@ -22,6 +22,8 @@ Conventions:
 - C tests: SP_TEST(name, "REQ-nnn") with SP_ASSERT / SP_ASSERT_EQ_INT /
   SP_ASSERT_NEAR. Python tests: @pytest.mark.verifies("REQ-nnn").
 - Test every limit at its boundary: just below, at, and just above.
+- Tests use public interfaces only; never #include a .c file. A new C test
+  file must be registered in its CMakeLists.txt or it will not be built.
 - Keep changes minimal and consistent with the surrounding code.
 
 Edits are exact search/replace pairs. The search text must be copied verbatim

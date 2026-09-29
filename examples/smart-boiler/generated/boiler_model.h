@@ -28,6 +28,7 @@ typedef enum {
     BOILER_FAULT_VALVE_FAILURE,
     BOILER_FAULT_TEMP_HIGH,
     BOILER_FAULT_PRESSURE_HIGH,
+    BOILER_FAULT_HEATUP_TIMEOUT,
     BOILER_FAULT_COUNT
 } BoilerFault;
 
@@ -149,6 +150,7 @@ typedef struct {
     float heater_kp;  /* Proportional gain [%/degC] */
     float heater_ki;  /* Integral gain [%/(degC*s)] */
     uint32_t init_time_ms;  /* Duration of the INIT state [ms] */
+    uint32_t heatup_timeout_ms;  /* REQ-042: warn when incomplete heat-up elapsed time since entry to STARTUP exceeds this duration, including time in RUNNING [ms] */
 } BoilerConfig;
 
 BoilerConfig boiler_config_default(void);

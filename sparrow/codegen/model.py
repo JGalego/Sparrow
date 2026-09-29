@@ -96,6 +96,11 @@ def _require(condition: bool, message: str) -> None:
 
 def _unique_names(kind: str, names: list[str]) -> None:
     for name in names:
+        _require(
+            isinstance(name, str),
+            f"{kind} name {name!r} is not a string; YAML reads bare ON, OFF, YES and NO as "
+            "booleans, so quote the name",
+        )
         _require(bool(NAME.match(name)), f"{kind} name '{name}' is not a valid identifier")
     duplicates = {n for n in names if names.count(n) > 1}
     _require(not duplicates, f"duplicate {kind} name(s): {sorted(duplicates)}")

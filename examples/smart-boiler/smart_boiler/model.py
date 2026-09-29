@@ -37,6 +37,7 @@ class Fault(IntEnum):
     VALVE_FAILURE = 9
     TEMP_HIGH = 10
     PRESSURE_HIGH = 11
+    HEATUP_TIMEOUT = 12
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,7 @@ FAULT_INFO = {
     Fault.VALVE_FAILURE: FaultInfo("Valve failure", True, "REQ-014"),
     Fault.TEMP_HIGH: FaultInfo("High temperature", False, "REQ-007"),
     Fault.PRESSURE_HIGH: FaultInfo("High pressure", False, "REQ-009"),
+    Fault.HEATUP_TIMEOUT: FaultInfo("Heat-up timeout", False, "REQ-042"),
 }
 
 
@@ -230,6 +232,7 @@ class BoilerConfig(ctypes.Structure):
         ("heater_kp", ctypes.c_float),
         ("heater_ki", ctypes.c_float),
         ("init_time_ms", ctypes.c_uint32),
+        ("heatup_timeout_ms", ctypes.c_uint32),
     ]
 
 
@@ -265,6 +268,7 @@ CONFIG_DEFAULTS = {
     "heater_kp": 12.0,
     "heater_ki": 0.15,
     "init_time_ms": 1000,
+    "heatup_timeout_ms": 1200000,
 }
 
 

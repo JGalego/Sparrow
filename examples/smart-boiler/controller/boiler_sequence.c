@@ -81,17 +81,33 @@ static void run_standby(BoilerController *c, const BoilerCommands *commands)
     }
 }
 
+/*
+ * A stop takes effect in the step that accepts it: that step already drives
+ * the SHUTDOWN outputs (heater off, circulation on). SHUTDOWN's own exit
+ * condition is evaluated from the next step.
+ */
+static bool accept_stop(BoilerController *c, const BoilerCommands *commands)
+{
+    if (!commands->stop) {
+        return false;
+    }
+    enter_state(c, BOILER_STATE_SHUTDOWN);
+    set_outputs(c, 0.0f, false, true, true);
+    return true;
+}
+
 static void run_startup(BoilerController *c, const BoilerCommands *commands, uint32_t dt_ms)
 {
+    if (accept_stop(c, commands)) {
+        return;
+    }
     const bool pump = valve_proven_open(c);
     const bool established = sp_persist_update(
         &c->flow_established, pump && c->measurements.pump_running && flow_present(c),
         c->config.flow_ok_delay_ms, dt_ms);
 
     set_outputs(c, 0.0f, false, pump, true);
-    if (commands->stop) {
-        enter_state(c, BOILER_STATE_SHUTDOWN);
-    } else if (established) {
+    if (established) {
         enter_state(c, BOILER_STATE_RUNNING);
     }
 }
@@ -101,6 +117,9 @@ static void run_running(BoilerController *c, const BoilerCommands *commands, uin
     float heater_pct = 0.0f;
     const bool permitted = heater_permitted(c);
 
+    if (accept_stop(c, commands)) {
+        return;
+    }
     if (permitted) {
         const float error = c->setpoint_c - c->measurements.temperature_c.value;
         heater_pct = sp_pi_step(&c->heater_pi, error, (float)dt_ms / 1000.0f);
@@ -108,9 +127,6 @@ static void run_running(BoilerController *c, const BoilerCommands *commands, uin
         sp_pi_reset(&c->heater_pi);
     }
     set_outputs(c, heater_pct, permitted, true, true);
-    if (commands->stop) {
-        enter_state(c, BOILER_STATE_SHUTDOWN);
-    }
 }
 
 static void run_shutdown(BoilerController *c)

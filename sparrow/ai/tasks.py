@@ -61,6 +61,10 @@ def _add_protected(ai: AIProject, context: Context) -> None:
     context.add("protected (generated) files", "\n".join(ai.protected))
 
 
+def _add_generated_headers(ai: AIProject, context: Context) -> None:
+    context.add_files([p for p in ai.protected_paths() if p.suffix == ".h"], "generated, read-only")
+
+
 def _next_requirement_id(trace: Trace) -> str:
     numbers = [int(r.id.split("-")[1]) for r in trace.requirements]
     return f"REQ-{max(numbers, default=0) + 1:03d}"
@@ -69,6 +73,7 @@ def _next_requirement_id(trace: Trace) -> str:
 def _add_requirement_with_links(ai, trace, context, requirement_id: str) -> None:
     requirement = _requirement(trace, requirement_id)
     context.add(f"requirement {requirement_id}", _requirement_yaml(requirement))
+    context.add_file(requirement.source, f"defines {requirement_id}")
     context.add_files(_implementation_files(ai, requirement), "implements it")
     context.add_files(sorted({t.path for t in trace.tests_for(requirement_id)}), "verifies it")
 
@@ -112,7 +117,7 @@ def build_model(ai, trace, context, requirement_id, options) -> str:
 def build_code(ai, trace, context, requirement_id, options) -> str:
     _add_requirement_with_links(ai, trace, context, requirement_id)
     context.add_files(ai.files("code"), "controller")
-    context.add_files([p for p in ai.protected_paths() if p.suffix == ".h"], "generated, read-only")
+    _add_generated_headers(ai, context)
     _add_protected(ai, context)
     return (
         f"Implement {requirement_id} in the controller. Keep the controller deterministic: "
@@ -130,12 +135,19 @@ def build_tests(ai, trace, context, requirement_id, options) -> str:
         [p for p in ai.files("tests") if p.name in ("boiler_fixture.h", "conftest.py")],
         "test fixtures",
     )
+    context.add_files([p for p in ai.files("tests") if p.name == "CMakeLists.txt"], "test build")
+    _add_generated_headers(ai, context)
+    harness = ai.repo / "sparrow" / "testing" / "sp_test.h"
+    context.add_file(harness, "C test harness")
     return (
         f"Write tests that verify {requirement_id}. Test each limit it names just below, at "
-        "and just above the limit, and the failure behaviour, not only the normal case. Add "
-        "C unit tests for controller logic and pytest closed-loop tests where the plant's "
-        "dynamics matter. Every new test must cite the requirement. Do not duplicate "
-        "existing tests shown in the context."
+        "and just above the limit, and the failure behaviour, not only the normal case: the "
+        "condition must be shown to raise its alarm as well as not to. Add C unit tests for "
+        "controller logic and pytest closed-loop tests where the plant's dynamics matter. "
+        "Every new test must cite the requirement. Test through the public interface, as the "
+        "existing tests do (the fixture and boiler_step); never #include a .c file or call a "
+        "static function. Register every new C test file in the test CMakeLists.txt with "
+        "sparrow_add_c_test. Do not duplicate existing tests shown in the context."
     )
 
 
@@ -226,6 +238,7 @@ def build_explain(ai, trace, context, results_glob, options) -> str:
             context.add_file(test.path, "failing test")
             for requirement_id in test.requirements:
                 _add_requirement_with_links(ai, trace, context, requirement_id)
+    _add_generated_headers(ai, context)
     return (
         "Explain why these tests fail. For each failure say whether the test, the "
         "implementation or the requirement is wrong, citing the lines that show it, and "
