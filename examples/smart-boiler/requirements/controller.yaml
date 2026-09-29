@@ -343,10 +343,8 @@ requirements:
       Slow heat-up can indicate inadequate heater capacity or excessive heat
       loss without requiring a shutdown. Including startup time detects an
       excessively long wait for circulation as well as slow heating. Existing
-      critical faults and interlocks remain authoritative. A subsequent model
-      task should add heatup_timeout_ms, a u32 duration in milliseconds with
-      default 1200000, to make the timeout configurable; no existing config
-      parameter represents this duration.
+      critical faults and interlocks remain authoritative. The duration is the
+      configuration parameter heatup_timeout_ms (default 1200000 ms).
     component: controller
     priority: should
     verification: test
