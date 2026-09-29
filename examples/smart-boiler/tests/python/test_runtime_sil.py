@@ -210,8 +210,14 @@ def test_shutdown_writes_safe_outputs(rig):
 
     stderr = rig.terminate()
 
-    frames = [f for f in listener.receive() if f.kind == FrameKind.OUTPUTS]
-    last = BoilerOutputs.from_buffer_copy(frames[-1].payload)
+    # Loopback delivery completes in a softirq that can run after the sender
+    # has exited, so collect for a moment instead of draining once.
+    frames = []
+    deadline = time.monotonic() + 0.3
+    while time.monotonic() < deadline:
+        frames += [f for f in listener.receive() if f.kind == FrameKind.OUTPUTS]
+        time.sleep(0.01)
+    last = BoilerOutputs.from_buffer_copy(max(frames, key=lambda f: f.sequence).payload)
     assert (last.heater_contactor, last.pump_run, last.valve_open, last.alarm_horn) == (0, 0, 0, 0)
     assert "overruns" in stderr
 
