@@ -4,7 +4,7 @@ Status: accepted
 
 ## Context
 
-Sparrow uses language models to draft requirements, code and tests. A model's output varies between runs and providers, needs a network or a large local model, and cannot be certified. The controller must behave identically on a workstation, in CI and on the target.
+Sparrow uses language models to draft requirements, code and tests. A model's output varies between runs and providers, needs a network or a large local model, and cannot be certified. The controller must give the same outputs for the same inputs wherever it runs.
 
 ## Decision
 

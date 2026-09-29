@@ -107,7 +107,7 @@ AI is never part of the build, the tests, the simulator or the deployed control 
 
 ## Philosophy
 
-- **Determinism.** The controller's outputs depend only on its configuration, its inputs and the step length. A test run on a laptop behaves exactly like the target.
+- **Determinism.** The controller's outputs depend only on its configuration, its inputs and the step lengths. It reads no clock and keeps no hidden state, so a recorded input sequence replays exactly.
 - **Explicit artifacts.** Requirements, interfaces, faults and scenarios are human-readable files. Nothing important lives in a tool's database or a prompt history.
 - **Separation.** Specification, controller, plant, HMI and platform code are separate modules. Any one of them can be replaced or used on its own.
 - **Workstation first.** The whole loop runs on a Linux desktop before any hardware is involved.
