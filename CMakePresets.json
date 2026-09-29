@@ -1,0 +1,51 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {"major": 3, "minor": 20, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "host",
+      "displayName": "Desktop Linux, SDL simulator",
+      "binaryDir": "${sourceDir}/build/host",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}
+    },
+    {
+      "name": "host-asan",
+      "displayName": "Desktop Linux with AddressSanitizer and UBSan",
+      "binaryDir": "${sourceDir}/build/host-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SPARROW_SANITIZE": "address,undefined"
+      }
+    },
+    {
+      "name": "host-headless",
+      "displayName": "Desktop Linux without SDL (CI)",
+      "binaryDir": "${sourceDir}/build/host-headless",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "SPARROW_DISPLAY_BACKENDS": "headless"
+      }
+    },
+    {
+      "name": "target-aarch64",
+      "displayName": "Embedded Linux, aarch64 (i.MX 8 class), framebuffer display",
+      "binaryDir": "${sourceDir}/build/target-aarch64",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/aarch64-linux-gnu.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SPARROW_BUILD_TESTS": "OFF",
+        "SPARROW_DISPLAY_BACKENDS": "fbdev"
+      }
+    }
+  ],
+  "buildPresets": [
+    {"name": "host", "configurePreset": "host"},
+    {"name": "host-asan", "configurePreset": "host-asan"},
+    {"name": "host-headless", "configurePreset": "host-headless"},
+    {"name": "target-aarch64", "configurePreset": "target-aarch64"}
+  ],
+  "testPresets": [
+    {"name": "host", "configurePreset": "host", "output": {"outputOnFailure": true}},
+    {"name": "host-asan", "configurePreset": "host-asan", "output": {"outputOnFailure": true}}
+  ]
+}

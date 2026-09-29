@@ -1,0 +1,9 @@
+# Sparrow project descriptor. Paths are relative to this file.
+name: smart-boiler
+model: model/boiler.yaml
+requirements:
+  - requirements/*.yaml
+tests:
+  - tests/c
+  - tests/python
+  - ../../tests/core

@@ -1,0 +1,322 @@
+# Controller requirements. The tests that verify a requirement declare it
+# themselves (SP_TEST(..., "REQ-xxx") in C, @pytest.mark.verifies("REQ-xxx") in
+# Python); `sparrow trace` joins both sides.
+requirements:
+  - id: REQ-001
+    title: Signal scaling
+    statement: >
+      The controller shall convert each 4-20 mA input linearly to engineering
+      units over the configured span and round the result to the transmitter
+      resolution (0.1 degC, 0.01 bar, 0.1 L/min, 0.1 %).
+    rationale: >
+      Limit comparisons must not depend on floating-point error left by the
+      unit conversion. A reading of 110.0 degC has to compare equal to a limit
+      of 110.0 degC.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [temperature_min_c, temperature_max_c, pressure_max_bar, flow_max_lpm]
+    implementation:
+      - controller/boiler_measure.c::scale
+
+  - id: REQ-002
+    title: Sensor fault detection
+    statement: >
+      The controller shall treat a loop current outside
+      [loop_fault_low_ma, loop_fault_high_ma] as an invalid reading and shall
+      raise the matching critical sensor fault after the reading has been
+      invalid for sensor_fault_delay_ms.
+    rationale: >
+      A current below 3.6 mA or above 21 mA indicates a broken wire or a
+      shorted loop (NAMUR NE43). The debounce time avoids tripping on a
+      single corrupted sample. Until the fault is raised the reading is
+      already unusable, so dependent interlocks act immediately.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [loop_fault_low_ma, loop_fault_high_ma, sensor_fault_delay_ms]
+    implementation:
+      - controller/boiler_measure.c::scale
+      - controller/boiler_faults.c::update_sensor_faults
+
+  - id: REQ-003
+    title: Startup sequence
+    statement: >
+      On a start request in STANDBY the controller shall enter STARTUP, open
+      the valve, start the pump only after the valve position has reached
+      valve_open_pct, and enter RUNNING after flow of at least flow_min_lpm
+      has been present for flow_ok_delay_ms. The heater shall stay off
+      during STARTUP.
+    rationale: >
+      Starting the pump against a closed valve raises the boiler pressure
+      (see REQ-008). Heating without proven flow risks local boiling.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [valve_open_pct, flow_min_lpm, flow_ok_delay_ms, init_time_ms]
+    implementation:
+      - controller/boiler_sequence.c::run_init
+      - controller/boiler_sequence.c::run_standby
+      - controller/boiler_sequence.c::run_startup
+
+  - id: REQ-004
+    title: Temperature regulation
+    statement: >
+      In RUNNING the controller shall regulate the boiler temperature to the
+      setpoint with a PI regulator that limits the heater power to 0-100 %
+      and does not wind up while saturated. At the reference plant the
+      temperature shall stay within 2 degC of the setpoint in steady state
+      and overshoot by less than 3 degC after a heat-up.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [heater_kp, heater_ki]
+    implementation:
+      - controller/boiler_sequence.c::run_running
+      - ../../sparrow/core/sp_pi.c::sp_pi_step
+
+  - id: REQ-005
+    title: Setpoint limits
+    statement: >
+      The controller shall apply a setpoint request only if the requested
+      value lies within [setpoint_min_c, setpoint_max_c]. A rejected request
+      shall leave the setpoint unchanged.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [setpoint_default_c, setpoint_min_c, setpoint_max_c]
+    implementation:
+      - controller/boiler_sequence.c::apply_setpoint_command
+
+  - id: REQ-006
+    title: Over-temperature trip
+    statement: >
+      When the boiler temperature exceeds temperature_trip_c the controller
+      shall, in the same control step, open the heater contactor, set the
+      heater power to zero, latch the over-temperature alarm and enter FAULT.
+    rationale: >
+      The contactor is independent of the solid-state relay. It removes heat
+      input even if the relay has failed shorted, which is the failure this
+      trip exists for. Circulation after the trip is covered by REQ-016.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [temperature_trip_c, temperature_hysteresis_c]
+    implementation:
+      - controller/boiler_faults.c::update_temperature_faults
+      - controller/boiler_sequence.c::run_fault
+
+  - id: REQ-007
+    title: High-temperature warning
+    statement: >
+      The controller shall raise a non-latching warning when the boiler
+      temperature has exceeded temperature_warn_c for warning_delay_ms, and
+      clear it when the temperature falls to temperature_warn_c minus
+      temperature_hysteresis_c. The warning shall not change the state.
+    component: controller
+    priority: should
+    verification: test
+    parameters: [temperature_warn_c, temperature_hysteresis_c, warning_delay_ms]
+    implementation:
+      - controller/boiler_faults.c::update_temperature_faults
+
+  - id: REQ-008
+    title: Over-pressure trip
+    statement: >
+      When the boiler pressure exceeds pressure_trip_bar the controller shall
+      open the heater contactor, latch the over-pressure alarm and enter
+      FAULT in the same control step.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [pressure_trip_bar, pressure_hysteresis_bar]
+    implementation:
+      - controller/boiler_faults.c::update_pressure_faults
+
+  - id: REQ-009
+    title: High-pressure warning
+    statement: >
+      The controller shall raise a non-latching warning when the boiler
+      pressure has exceeded pressure_warn_bar for warning_delay_ms.
+    component: controller
+    priority: should
+    verification: test
+    parameters: [pressure_warn_bar, warning_delay_ms]
+    implementation:
+      - controller/boiler_faults.c::update_pressure_faults
+
+  - id: REQ-010
+    title: Low-pressure trip
+    statement: >
+      When the boiler pressure has been below pressure_low_bar for
+      pressure_low_delay_ms the controller shall latch the low-pressure alarm
+      and enter FAULT.
+    rationale: Low pressure means a leak or an empty system. Heating it risks dry-firing the element.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [pressure_low_bar, pressure_low_delay_ms]
+    implementation:
+      - controller/boiler_faults.c::update_pressure_faults
+
+  - id: REQ-011
+    title: Pump failure detection
+    statement: >
+      The controller shall latch a pump failure and enter FAULT when the pump
+      contactor feedback has disagreed with the pump command for
+      pump_feedback_delay_ms.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [pump_feedback_delay_ms]
+    implementation:
+      - controller/boiler_faults.c::update_pump_faults
+
+  - id: REQ-012
+    title: Loss-of-flow detection
+    statement: >
+      The controller shall latch a no-flow fault and enter FAULT when the
+      pump has been commanded on for at least flow_proof_delay_ms and the
+      measured flow has been below flow_min_lpm for flow_loss_delay_ms.
+    rationale: >
+      A seized or dry-running pump reports "running" on its contactor
+      feedback, so only the flow measurement reveals it.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [flow_min_lpm, flow_proof_delay_ms, flow_loss_delay_ms]
+    implementation:
+      - controller/boiler_faults.c::update_pump_faults
+
+  - id: REQ-013
+    title: Heater interlock
+    statement: >
+      The heater contactor shall be closed only in RUNNING and only while, in
+      the current control step, the temperature reading is valid, the pump
+      feedback is true, the flow is at least flow_min_lpm and the valve
+      position is at least valve_open_pct. The heater power shall be zero
+      whenever the contactor is open.
+    rationale: >
+      The interlock acts in the same step as the loss of a condition. The
+      fault alarms that follow (REQ-002, REQ-011, REQ-012) are debounced and
+      come later.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [flow_min_lpm, valve_open_pct]
+    implementation:
+      - controller/boiler_sequence.c::heater_permitted
+      - controller/boiler_sequence.c::set_outputs
+
+  - id: REQ-014
+    title: Valve failure detection
+    statement: >
+      The controller shall latch a valve failure and enter FAULT when the
+      valve position has not reached valve_open_pct (commanded open) or
+      fallen to valve_closed_pct (commanded closed) within
+      valve_travel_timeout_ms of the command.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [valve_open_pct, valve_closed_pct, valve_travel_timeout_ms]
+    implementation:
+      - controller/boiler_faults.c::update_valve_fault
+      - controller/boiler_controller.c::advance_command_timers
+
+  - id: REQ-015
+    title: Fault latching and reset
+    statement: >
+      Critical alarms shall stay latched after their condition clears. The
+      controller shall leave FAULT only on a reset request, and shall accept
+      the request only when no latched alarm still has an active condition.
+      Start requests in FAULT shall be ignored.
+    component: controller
+    priority: must
+    verification: test
+    implementation:
+      - ../../sparrow/core/sp_alarm.c::sp_alarms_reset
+      - controller/boiler_sequence.c::run_fault
+
+  - id: REQ-016
+    title: Actuator state in FAULT
+    statement: >
+      In FAULT the controller shall keep the heater off and the valve open.
+      It shall run the pump only while the boiler is above cooldown_c, or its
+      temperature is unknown, and no pump, flow, valve, over-pressure or
+      low-pressure fault is standing.
+    rationale: >
+      Circulation carries heat out of the boiler after a trip. It is withheld
+      whenever running the pump could do damage or is known not to work.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [cooldown_c]
+    implementation:
+      - controller/boiler_sequence.c::run_fault
+
+  - id: REQ-017
+    title: Shutdown sequence
+    statement: >
+      On a stop request in STARTUP or RUNNING the controller shall enter
+      SHUTDOWN, open the heater contactor, keep the pump running and the
+      valve open until the temperature is at or below cooldown_c, then enter
+      STANDBY. Start requests in SHUTDOWN shall be ignored.
+    component: controller
+    priority: must
+    verification: test
+    parameters: [cooldown_c]
+    implementation:
+      - controller/boiler_sequence.c::run_shutdown
+
+  - id: REQ-018
+    title: Manual pump and valve control
+    statement: >
+      The controller shall accept manual pump and valve requests only in
+      STANDBY and shall discard the manual selection on leaving STANDBY.
+      The heater shall remain off under manual control.
+    component: controller
+    priority: should
+    verification: test
+    implementation:
+      - controller/boiler_sequence.c::run_standby
+      - controller/boiler_sequence.c::enter_state
+
+  - id: REQ-019
+    title: Alarm acknowledgement
+    statement: >
+      A new alarm shall be marked unacknowledged. The horn shall sound while
+      a critical alarm is both active and unacknowledged. An acknowledge
+      request shall silence the horn and clear the unacknowledged flags
+      without clearing any alarm.
+    component: controller
+    priority: should
+    verification: test
+    implementation:
+      - ../../sparrow/core/sp_alarm.c::sp_alarms_update
+      - controller/boiler_controller.c::horn_required
+
+  - id: REQ-020
+    title: Deterministic control step
+    statement: >
+      The controller output and status shall depend only on the
+      configuration, the input and command sequence and the step lengths. The
+      controller shall not read a clock, allocate memory or use global state.
+      A step of zero length shall change nothing.
+    component: controller
+    priority: must
+    verification: test
+    implementation:
+      - controller/boiler_controller.c::boiler_step
+
+  - id: REQ-021
+    title: Configuration validation
+    statement: >
+      The controller shall refuse to initialize with a configuration that has
+      a parameter outside its allowed range or limits in the wrong order, and
+      shall report the offending parameter or relation.
+    component: controller
+    priority: must
+    verification: test
+    implementation:
+      - controller/boiler_controller.c::boiler_config_validate
+      - generated/boiler_model.c::boiler_config_check_ranges

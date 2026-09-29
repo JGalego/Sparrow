@@ -1,0 +1,160 @@
+# Smart Boiler engineering model.
+#
+# Single source for the interfaces shared by the controller (C), the plant
+# simulation (Python) and the HMI (C). `sparrow gen` turns this file into
+# the C header/source and the Python ctypes module listed under `outputs`.
+
+application: smart-boiler
+schema: 1
+prefix: Boiler
+
+outputs:
+  c_header: ../generated/boiler_model.h
+  c_source: ../generated/boiler_model.c
+  python: ../smart_boiler/model.py
+
+states:
+  - {name: INIT, label: Initializing}
+  - {name: STANDBY, label: Standby}
+  - {name: STARTUP, label: Starting}
+  - {name: RUNNING, label: Running}
+  - {name: SHUTDOWN, label: Shutting down}
+  - {name: FAULT, label: Fault}
+
+# Bit positions in the alarm masks. `severity: critical` alarms force the
+# FAULT state; `warning` alarms only notify.
+faults:
+  - {name: TEMP_SENSOR, severity: critical, text: Temperature sensor fault, requirement: REQ-002}
+  - {name: PRESSURE_SENSOR, severity: critical, text: Pressure sensor fault, requirement: REQ-002}
+  - {name: FLOW_SENSOR, severity: critical, text: Flow sensor fault, requirement: REQ-002}
+  - {name: VALVE_SENSOR, severity: critical, text: Valve position sensor fault, requirement: REQ-002}
+  - {name: OVER_TEMP, severity: critical, text: Over-temperature trip, requirement: REQ-006}
+  - {name: OVER_PRESSURE, severity: critical, text: Over-pressure trip, requirement: REQ-008}
+  - {name: LOW_PRESSURE, severity: critical, text: Low pressure, requirement: REQ-010}
+  - {name: PUMP_FAILURE, severity: critical, text: Pump failure, requirement: REQ-011}
+  - {name: NO_FLOW, severity: critical, text: No flow, requirement: REQ-012}
+  - {name: VALVE_FAILURE, severity: critical, text: Valve failure, requirement: REQ-014}
+  - {name: TEMP_HIGH, severity: warning, text: High temperature, requirement: REQ-007}
+  - {name: PRESSURE_HIGH, severity: warning, text: High pressure, requirement: REQ-009}
+
+structs:
+  Inputs:
+    description: Field inputs sampled once per control step.
+    fields:
+      - {name: temperature_ma, type: f32, unit: mA, description: "Boiler temperature transmitter, 4-20 mA"}
+      - {name: pressure_ma, type: f32, unit: mA, description: "Boiler pressure transmitter, 4-20 mA"}
+      - {name: flow_ma, type: f32, unit: mA, description: "Flow transmitter, 4-20 mA"}
+      - {name: valve_position_ma, type: f32, unit: mA, description: "Valve position feedback, 4-20 mA"}
+      - {name: pump_running, type: u8, description: "Pump contactor auxiliary contact"}
+  Outputs:
+    description: Actuator commands produced by every control step.
+    fields:
+      - {name: heater_power_pct, type: f32, unit: "%", description: "Heater power request for the solid-state relay"}
+      - {name: heater_contactor, type: u8, description: "1 closes the heater safety contactor"}
+      - {name: pump_run, type: u8, description: "1 starts the pump"}
+      - {name: valve_open, type: u8, description: "1 drives the valve open, 0 closed"}
+      - {name: alarm_horn, type: u8, description: "1 sounds the horn"}
+  Commands:
+    description: >
+      Operator requests. Request fields are edge-triggered: the controller
+      acts on a non-zero value during the step that receives it.
+    fields:
+      - {name: setpoint_c, type: f32, unit: degC, description: "New temperature setpoint, used when set_setpoint is 1"}
+      - {name: start, type: u8, description: "1 requests startup"}
+      - {name: stop, type: u8, description: "1 requests shutdown"}
+      - {name: ack, type: u8, description: "1 acknowledges all alarms"}
+      - {name: reset, type: u8, description: "1 requests a fault reset"}
+      - {name: set_setpoint, type: u8, description: "1 applies setpoint_c"}
+      - {name: pump_manual, type: u8, description: "Standby only: 1 pump on, 2 pump off, 0 no request"}
+      - {name: valve_manual, type: u8, description: "Standby only: 1 valve open, 2 valve closed, 0 no request"}
+  Status:
+    description: Controller state published after every step.
+    fields:
+      - {name: temperature_c, type: f32, unit: degC, description: "Scaled boiler temperature"}
+      - {name: pressure_bar, type: f32, unit: bar, description: "Scaled boiler pressure"}
+      - {name: flow_lpm, type: f32, unit: L/min, description: "Scaled flow"}
+      - {name: valve_position_pct, type: f32, unit: "%", description: "Scaled valve position"}
+      - {name: heater_power_pct, type: f32, unit: "%", description: "Heater power request"}
+      - {name: setpoint_c, type: f32, unit: degC, description: "Active setpoint"}
+      - {name: alarms_active, type: u32, description: "Bit mask of alarms whose condition is present"}
+      - {name: alarms_latched, type: u32, description: "Bit mask of latched alarms"}
+      - {name: alarms_unacked, type: u32, description: "Bit mask of unacknowledged alarms"}
+      - {name: uptime_ms, type: u32, unit: ms, description: "Controller time since init"}
+      - {name: state_time_ms, type: u32, unit: ms, description: "Time in the current state"}
+      - {name: state, type: u8, description: "BoilerState"}
+      - {name: pump_on, type: u8, description: "Pump commanded on"}
+      - {name: valve_open, type: u8, description: "Valve commanded open"}
+      - {name: heater_contactor, type: u8, description: "Heater contactor commanded closed"}
+      - {name: temperature_valid, type: u8, description: "Temperature reading passed the range check"}
+      - {name: pressure_valid, type: u8, description: "Pressure reading passed the range check"}
+      - {name: flow_valid, type: u8, description: "Flow reading passed the range check"}
+      - {name: valve_valid, type: u8, description: "Valve position reading passed the range check"}
+      - {name: alarm_horn, type: u8, description: "Horn commanded on"}
+  FaultInjection:
+    description: Simulator-only request to inject or clear a plant fault.
+    fields:
+      - {name: fault, type: u16, description: "BoilerPlantFault, 0 with action 2 clears all"}
+      - {name: action, type: u8, description: "1 inject, 0 clear one, 2 clear all"}
+
+# Datagram kinds exchanged between simulator/controller and HMI.
+frames:
+  - {name: STATUS, value: 1, struct: Status}
+  - {name: COMMANDS, value: 2, struct: Commands}
+  - {name: FAULT_INJECTION, value: 3, struct: FaultInjection}
+
+# Controller configuration. Defaults are compiled in; min/max are enforced by
+# boiler_config_check_ranges() before the controller starts.
+config:
+  # Signal scaling (4-20 mA loops)
+  - {name: temperature_min_c, default: 0.0, min: -50.0, max: 100.0, unit: degC, description: "Temperature at 4 mA"}
+  - {name: temperature_max_c, default: 150.0, min: 100.0, max: 400.0, unit: degC, description: "Temperature at 20 mA"}
+  - {name: pressure_max_bar, default: 6.0, min: 1.0, max: 100.0, unit: bar, description: "Pressure at 20 mA (0 bar at 4 mA)"}
+  - {name: flow_max_lpm, default: 100.0, min: 1.0, max: 1000.0, unit: L/min, description: "Flow at 20 mA (0 at 4 mA)"}
+  - {name: loop_fault_low_ma, default: 3.6, min: 0.0, max: 4.0, unit: mA, description: "Below this the loop is treated as open"}
+  - {name: loop_fault_high_ma, default: 21.0, min: 20.0, max: 24.0, unit: mA, description: "Above this the loop is treated as shorted"}
+  - {name: sensor_fault_delay_ms, type: u32, default: 500, min: 0, max: 10000, unit: ms, description: "Out-of-range time before a sensor fault"}
+  # Setpoint
+  - {name: setpoint_default_c, default: 80.0, min: 20.0, max: 120.0, unit: degC, description: "Setpoint after power-up"}
+  - {name: setpoint_min_c, default: 40.0, min: 20.0, max: 120.0, unit: degC, description: "Lowest accepted setpoint"}
+  - {name: setpoint_max_c, default: 90.0, min: 20.0, max: 120.0, unit: degC, description: "Highest accepted setpoint"}
+  # Temperature limits
+  - {name: temperature_warn_c, default: 100.0, min: 30.0, max: 200.0, unit: degC, description: "High-temperature warning"}
+  - {name: temperature_trip_c, default: 110.0, min: 30.0, max: 200.0, unit: degC, description: "Over-temperature trip"}
+  - {name: temperature_hysteresis_c, default: 3.0, min: 0.0, max: 20.0, unit: degC, description: "Clearing band below the warning and trip limits"}
+  - {name: cooldown_c, default: 55.0, min: 20.0, max: 100.0, unit: degC, description: "Circulation continues above this temperature"}
+  - {name: warning_delay_ms, type: u32, default: 1000, min: 0, max: 60000, unit: ms, description: "Time a warning condition must persist"}
+  # Pressure limits
+  - {name: pressure_warn_bar, default: 3.5, min: 0.5, max: 50.0, unit: bar, description: "High-pressure warning"}
+  - {name: pressure_trip_bar, default: 4.0, min: 0.5, max: 50.0, unit: bar, description: "Over-pressure trip"}
+  - {name: pressure_low_bar, default: 0.8, min: 0.0, max: 10.0, unit: bar, description: "Low-pressure trip"}
+  - {name: pressure_hysteresis_bar, default: 0.2, min: 0.0, max: 5.0, unit: bar, description: "Clearing band for pressure limits"}
+  - {name: pressure_low_delay_ms, type: u32, default: 2000, min: 0, max: 60000, unit: ms, description: "Time low pressure must persist"}
+  # Pump, flow and valve supervision
+  - {name: flow_min_lpm, default: 5.0, min: 0.1, max: 500.0, unit: L/min, description: "Flow below this counts as no flow"}
+  - {name: flow_proof_delay_ms, type: u32, default: 5000, min: 0, max: 60000, unit: ms, description: "Time after pump start before flow is required"}
+  - {name: flow_loss_delay_ms, type: u32, default: 3000, min: 0, max: 60000, unit: ms, description: "Time without flow before the no-flow trip"}
+  - {name: flow_ok_delay_ms, type: u32, default: 1000, min: 0, max: 60000, unit: ms, description: "Flow must be present this long to finish startup"}
+  - {name: pump_feedback_delay_ms, type: u32, default: 2000, min: 0, max: 60000, unit: ms, description: "Contactor feedback may disagree with the command this long"}
+  - {name: valve_travel_timeout_ms, type: u32, default: 12000, min: 1000, max: 120000, unit: ms, description: "Time allowed for the valve to reach its commanded end position"}
+  - {name: valve_open_pct, default: 90.0, min: 50.0, max: 100.0, unit: "%", description: "Position that counts as open"}
+  - {name: valve_closed_pct, default: 10.0, min: 0.0, max: 50.0, unit: "%", description: "Position that counts as closed"}
+  # Heater regulation
+  - {name: heater_kp, default: 12.0, min: 0.0, max: 100.0, unit: "%/degC", description: "Proportional gain"}
+  - {name: heater_ki, default: 0.15, min: 0.0, max: 10.0, unit: "%/(degC*s)", description: "Integral gain"}
+  # Sequencing
+  - {name: init_time_ms, type: u32, default: 1000, min: 0, max: 60000, unit: ms, description: "Duration of the INIT state"}
+
+# Faults the plant simulation can inject. HMI debug panel and scenarios use these names.
+plant_faults:
+  - {name: TEMP_SENSOR_OPEN, label: Temperature sensor open}
+  - {name: TEMP_SENSOR_SHORT, label: Temperature sensor short}
+  - {name: TEMP_SENSOR_OFFSET, label: Temperature sensor +8 degC}
+  - {name: PRESSURE_SENSOR_OPEN, label: Pressure sensor open}
+  - {name: FLOW_SENSOR_OPEN, label: Flow sensor open}
+  - {name: VALVE_SENSOR_OPEN, label: Valve sensor open}
+  - {name: PUMP_TRIPPED, label: Pump tripped}
+  - {name: PUMP_SEIZED, label: Pump seized}
+  - {name: VALVE_STUCK, label: Valve stuck}
+  - {name: HEATER_SSR_SHORTED, label: Heater relay shorted}
+  - {name: LEAK, label: Water leak}
+  - {name: EXPANSION_VESSEL_FAILED, label: Expansion vessel failed}

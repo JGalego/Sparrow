@@ -1,0 +1,25 @@
+requirements:
+  - id: REQ-040
+    title: Plant fault injection
+    statement: >
+      The plant simulation shall allow every fault listed under plant_faults in
+      the model to be injected and cleared at run time, individually or all at
+      once, and shall reject unknown fault names.
+    component: plant
+    priority: must
+    verification: test
+    implementation:
+      - smart_boiler/plant.py::inject
+      - smart_boiler/plant.py::clear
+
+  - id: REQ-041
+    title: Deterministic simulation
+    statement: >
+      Two simulation runs with the same parameters, seed, events and commands
+      shall produce identical traces. Sensor noise shall come from a seeded
+      generator owned by the plant.
+    component: plant
+    priority: must
+    verification: test
+    implementation:
+      - smart_boiler/plant.py::BoilerPlant

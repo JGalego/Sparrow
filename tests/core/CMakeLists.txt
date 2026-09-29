@@ -1,0 +1,6 @@
+sparrow_add_c_test(test_alarm SOURCES test_alarm.c LIBRARIES sparrow_core)
+sparrow_add_c_test(test_persist SOURCES test_persist.c LIBRARIES sparrow_core)
+sparrow_add_c_test(test_pi SOURCES test_pi.c LIBRARIES sparrow_core)
+sparrow_add_c_test(test_ring SOURCES test_ring.c LIBRARIES sparrow_core)
+sparrow_add_c_test(test_frame SOURCES test_frame.c LIBRARIES sparrow_core)
+sparrow_add_c_test(test_util SOURCES test_util.c LIBRARIES sparrow_core)
