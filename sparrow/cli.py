@@ -51,6 +51,15 @@ def _cmd_trace(args: argparse.Namespace) -> int:
     for error in trace.errors:
         print(f"trace error: {error}", file=sys.stderr)
     results = load_results([Path(p) for p in args.results]) if args.results else None
+    if results is not None:
+        for test in trace.tests:
+            if test.requirements and test.key not in results:
+                print(
+                    f"trace error: {test.path.name}:{test.line} {test.key} verifies "
+                    f"{','.join(test.requirements)} but did not run (not built or not collected)",
+                    file=sys.stderr,
+                )
+                trace.errors.append(f"{test.key} did not run")
     report = render(trace, results)
     if args.write:
         Path(args.write).write_text(report, encoding="utf-8")
