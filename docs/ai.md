@@ -190,7 +190,7 @@ sparrow ai tests REQ-042 --apply      # write it to the working tree
 sparrow ai tests REQ-042 --verify     # write it, then run the gates
 ```
 
-`--verify` runs the `ai.gates` commands from the repository root and stops at the first failure. For the Smart Boiler these are `make gen`, `make lint` and `make test`. A proposal that fails a gate stays in the working tree for inspection. `git checkout -- .` discards it. The command exits non-zero if a gate fails.
+`--verify` runs the `ai.gates` commands from the repository root and stops at the first failure. For the Smart Boiler these are `make gen`, `make format` and `make trace`, which regenerate derived files, then `make lint` and `make test`. A proposal that fails a gate stays in the working tree for inspection. `git checkout -- .` discards it. The command exits non-zero if a gate fails.
 
 ## Testing
 

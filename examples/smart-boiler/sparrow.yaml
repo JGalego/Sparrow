@@ -10,7 +10,8 @@ tests:
 
 # Optional AI assistance (`sparrow ai`). Paths are the only files each task may
 # change; gates are the commands `--verify` runs, from the repository root,
-# after applying a proposal.
+# after applying a proposal. The first three regenerate derived files
+# (interfaces, formatting, traceability) the way a developer would.
 ai:
   paths:
     requirements: [requirements/*.yaml]
@@ -23,5 +24,7 @@ ai:
     - ../../docs/traceability.md
   gates:
     - make gen
+    - make format
+    - make trace
     - make lint
     - make test
