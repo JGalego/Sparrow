@@ -16,7 +16,7 @@
 
 Sparrow is an open-source framework for building embedded control systems with graphical HMIs, from requirements to a running target. Its reference application is a Smart Boiler.
 
-![](docs/assets/hmi-normal.png)
+![](docs/assets/hmi-demo.gif)
 
 ## From idea to boiler
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerates the screenshots in docs/assets from scripted simulator scenarios.
+"""Regenerates the screenshots and the demo GIF in docs/assets from simulator scenarios.
 
 Each shot runs a scenario in the simulator until a fixed simulation time and
 captures the HMI headlessly, so the images are reproducible.
@@ -36,7 +36,20 @@ def main() -> int:
         if result.returncode != 0:
             print(f"failed: {name}", file=sys.stderr)
             return result.returncode
-    return 0
+    print("hmi-demo.gif: over-temperature, 30x")
+    return subprocess.run(
+        [
+            str(ROOT / "scripts" / "record-gif.sh"),
+            "over-temperature",
+            "30",
+            "110",
+            "100",
+            str(ASSETS / "hmi-demo.gif"),
+            "--range",
+            "2m",
+        ],
+        check=False,
+    ).returncode
 
 
 if __name__ == "__main__":
