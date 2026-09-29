@@ -257,8 +257,9 @@ requirements:
   - id: REQ-017
     title: Shutdown sequence
     statement: >
-      On a stop request in STARTUP or RUNNING the controller shall enter
-      SHUTDOWN, open the heater contactor, keep the pump running and the
+      On a stop request in STARTUP or RUNNING the controller shall, in the
+      same control step, enter SHUTDOWN and open the heater contactor. It
+      shall keep the pump running and the
       valve open until the temperature is at or below cooldown_c, then enter
       STANDBY. Start requests in SHUTDOWN shall be ignored.
     component: controller
