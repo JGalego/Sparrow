@@ -12,6 +12,10 @@ set(SPARROW_SANITIZE "" CACHE STRING "Sanitizers to enable, e.g. address,undefin
 set(SPARROW_DISPLAY_BACKENDS "sdl;headless" CACHE STRING
     "Display backends to compile: sdl, fbdev, headless")
 
+if(SPARROW_BUILD_HMI)
+    include(cmake/lvgl.cmake)
+endif()
+
 add_library(sparrow_warnings INTERFACE)
 target_compile_options(sparrow_warnings INTERFACE
     -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes)
@@ -27,6 +31,10 @@ if(SPARROW_BUILD_TESTS)
 endif()
 
 add_subdirectory(sparrow/core)
+if(SPARROW_BUILD_HMI)
+    add_subdirectory(sparrow/platform)
+    add_subdirectory(sparrow/hmi)
+endif()
 add_subdirectory(examples/smart-boiler)
 if(SPARROW_BUILD_TESTS)
     add_subdirectory(tests/core)

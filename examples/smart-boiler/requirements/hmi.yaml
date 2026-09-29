@@ -1,0 +1,70 @@
+requirements:
+  - id: REQ-030
+    title: Value severity
+    statement: >
+      The HMI shall classify each displayed process value as normal, warning
+      or critical from the controller's standing alarms, and shall show "--"
+      instead of a number when the controller reports the reading invalid.
+    rationale: >
+      The controller owns the limits and the debounce times. Deriving the
+      display class from its alarms keeps the screen consistent with what the
+      controller acted on.
+    component: hmi
+    priority: must
+    verification: test
+    implementation:
+      - hmi/boiler_view.c::build_process_values
+
+  - id: REQ-031
+    title: Process history
+    statement: >
+      The HMI shall keep one hour of temperature, setpoint and pressure
+      history at 1 Hz, overwrite the oldest samples when full, and present it
+      over 2, 10 and 60 minute ranges by averaging, with gaps where no data
+      exists.
+    component: hmi
+    priority: should
+    verification: test
+    implementation:
+      - hmi/boiler_app.c::record_history
+      - ../../sparrow/core/sp_ring.c::sp_ring_downsample
+
+  - id: REQ-032
+    title: Notification log
+    statement: >
+      The HMI shall log, newest first with the controller time, every state
+      change, every alarm that becomes standing or clears, every
+      acknowledgement and every loss and restoration of the link. The log
+      shall hold 64 entries.
+    component: hmi
+    priority: should
+    verification: test
+    implementation:
+      - hmi/boiler_notify.c::boiler_notify_observe
+
+  - id: REQ-033
+    title: Control enablement
+    statement: >
+      The HMI shall enable Start only in STANDBY, Stop only in STARTUP and
+      RUNNING, Reset only in FAULT, manual pump and valve control only in
+      STANDBY, and Acknowledge only while unacknowledged alarms exist. Every
+      operator action shall map to exactly one controller command, with
+      setpoint requests limited to the configured setpoint range.
+    component: hmi
+    priority: must
+    verification: test
+    implementation:
+      - hmi/boiler_view.c::build_controls
+      - hmi/boiler_actions.c::boiler_action_change_setpoint
+
+  - id: REQ-034
+    title: Link supervision
+    statement: >
+      The HMI shall report loss of the controller link when no status frame
+      has arrived for 2 seconds, disable all controls while the link is down,
+      and resume when frames arrive again.
+    component: hmi
+    priority: must
+    verification: test
+    implementation:
+      - hmi/boiler_app.c::boiler_app_tick

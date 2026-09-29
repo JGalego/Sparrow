@@ -13,6 +13,15 @@ target_include_directories(boiler_controller PUBLIC controller)
 target_link_libraries(boiler_controller PUBLIC boiler_model sparrow_core)
 set_target_properties(boiler_controller PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# HMI application state, view model and actions. No LVGL dependency.
+add_library(boiler_hmi_model STATIC
+    hmi/boiler_actions.c
+    hmi/boiler_app.c
+    hmi/boiler_notify.c
+    hmi/boiler_view.c)
+target_include_directories(boiler_hmi_model PUBLIC hmi ${CMAKE_SOURCE_DIR}/sparrow/hmi)
+target_link_libraries(boiler_hmi_model PUBLIC boiler_model sparrow_core)
+
 # Shared library loaded by the Python simulator through ctypes.
 add_library(boiler_controller_shared SHARED controller/boiler_capi.c)
 target_link_libraries(boiler_controller_shared PRIVATE boiler_controller)

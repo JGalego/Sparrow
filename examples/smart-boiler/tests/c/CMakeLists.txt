@@ -2,3 +2,4 @@ sparrow_add_c_test(test_boiler_measure SOURCES test_boiler_measure.c LIBRARIES b
 sparrow_add_c_test(test_boiler_faults SOURCES test_boiler_faults.c LIBRARIES boiler_controller)
 sparrow_add_c_test(test_boiler_sequence SOURCES test_boiler_sequence.c LIBRARIES boiler_controller)
 sparrow_add_c_test(test_boiler_config SOURCES test_boiler_config.c LIBRARIES boiler_controller)
+sparrow_add_c_test(test_hmi_model SOURCES test_hmi_model.c LIBRARIES boiler_hmi_model)
