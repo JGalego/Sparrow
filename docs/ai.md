@@ -171,6 +171,8 @@ sparrow ai review main       # branch against main
 
 Context: the diff and the requirements implemented by the files it touches. The report lists findings as `SEVERITY file:line [REQ]: text`. It reviews in addition to a person, not instead of one.
 
+[openai-walkthrough.md](openai-walkthrough.md) records one requirement taken through every stage with `gpt-6.1-sol`, including what failed.
+
 ## Proposals
 
 Proposal tasks reply with a JSON object: a summary, a rationale, and a list of edits. Each edit is either an exact search/replace in an existing file or the full content of a new file. Before anything is written, Sparrow checks that:
