@@ -1,0 +1,10 @@
+name: slow-heatup
+description: >
+  A degraded heater (4 kW instead of 15 kW) cannot bring a cold boiler to the
+  80 degC setpoint within 20 minutes. The heat-up timeout warning (REQ-042)
+  appears after 1200 s of heat-up while regulation continues.
+plant:
+  initial_temperature_c: 20.0
+  heater_power_w: 4000.0
+events:
+  - {at_s: 2, action: command, fields: {start: 1}}
