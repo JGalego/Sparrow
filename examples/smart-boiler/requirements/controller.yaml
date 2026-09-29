@@ -350,4 +350,7 @@ requirements:
     component: controller
     priority: should
     verification: test
-    implementation: []
+    parameters: [heatup_timeout_ms]
+    implementation:
+      - controller/boiler_controller.c::update_heatup
+      - controller/boiler_controller.c::boiler_step
