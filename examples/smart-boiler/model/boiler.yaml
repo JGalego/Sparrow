@@ -36,6 +36,7 @@ faults:
   - {name: VALVE_FAILURE, severity: critical, text: Valve failure, requirement: REQ-014}
   - {name: TEMP_HIGH, severity: warning, text: High temperature, requirement: REQ-007}
   - {name: PRESSURE_HIGH, severity: warning, text: High pressure, requirement: REQ-009}
+  - {name: HEATUP_TIMEOUT, severity: warning, text: Heat-up timeout, requirement: REQ-042}
 
 structs:
   Inputs:
@@ -147,6 +148,7 @@ config:
   - {name: heater_ki, default: 0.15, min: 0.0, max: 10.0, unit: "%/(degC*s)", description: "Integral gain"}
   # Sequencing
   - {name: init_time_ms, type: u32, default: 1000, min: 0, max: 60000, unit: ms, description: "Duration of the INIT state"}
+  - {name: heatup_timeout_ms, type: u32, default: 1200000, min: 0, max: 86400000, unit: ms, description: "REQ-042: warn when incomplete heat-up elapsed time since entry to STARTUP exceeds this duration, including time in RUNNING"}
 
 # Faults the plant simulation can inject. HMI debug panel and scenarios use these names.
 plant_faults:

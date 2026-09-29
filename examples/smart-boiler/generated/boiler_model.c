@@ -18,6 +18,7 @@ static const BoilerFaultInfo fault_table[BOILER_FAULT_COUNT] = {
     {"VALVE_FAILURE", "Valve failure", BOILER_SEVERITY_CRITICAL},
     {"TEMP_HIGH", "High temperature", BOILER_SEVERITY_WARNING},
     {"PRESSURE_HIGH", "High pressure", BOILER_SEVERITY_WARNING},
+    {"HEATUP_TIMEOUT", "Heat-up timeout", BOILER_SEVERITY_WARNING},
 };
 
 const BoilerFaultInfo *boiler_fault_info(BoilerFault fault)
@@ -73,6 +74,7 @@ BoilerConfig boiler_config_default(void)
         .heater_kp = 12.0f,
         .heater_ki = 0.15f,
         .init_time_ms = 1000,
+        .heatup_timeout_ms = 1200000,
     };
     return config;
 }
@@ -117,6 +119,7 @@ static const ParamRange param_ranges[] = {
     {"heater_kp", offsetof(BoilerConfig, heater_kp), 0, 0.0, 100.0},
     {"heater_ki", offsetof(BoilerConfig, heater_ki), 0, 0.0, 10.0},
     {"init_time_ms", offsetof(BoilerConfig, init_time_ms), 1, 0.0, 60000.0},
+    {"heatup_timeout_ms", offsetof(BoilerConfig, heatup_timeout_ms), 1, 0.0, 86400000.0},
 };
 
 int boiler_config_check_ranges(const BoilerConfig *config)
