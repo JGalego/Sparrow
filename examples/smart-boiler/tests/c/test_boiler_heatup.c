@@ -333,3 +333,81 @@ SP_TEST(heatup_critical_fault_cancels_warning_and_ignored_start_cannot_rearm, "R
     SP_ASSERT_EQ_INT(BOILER_STATE_FAULT, f.status.state);
     SP_ASSERT(!heatup_warning(&f));
 }
+
+SP_TEST(heatup_raised_setpoint_changes_target_without_restarting_timer, "REQ-042")
+{
+    BoilerFixture f;
+    const BoilerCommands none = {0};
+    BoilerCommands change = {.set_setpoint = 1};
+    float original_target;
+
+    SP_ASSERT_EQ_INT(SP_OK, heatup_start(&f, HEATUP_TIMEOUT_MS));
+    original_target = f.status.setpoint_c;
+    change.setpoint_c = original_target + 1.0f;
+    SP_ASSERT(change.setpoint_c <= f.controller.config.setpoint_max_c);
+    heatup_advance(&f, HEATUP_TIMEOUT_MS - 2U);
+    SP_ASSERT_EQ_INT(BOILER_STATE_RUNNING, f.status.state);
+
+    /* This reading would complete heat-up against the old target. */
+    fixture_set_temperature(&f, original_target);
+    heatup_step(&f, &change, 1U);
+    SP_ASSERT_EQ_INT(1, f.status.temperature_valid);
+    SP_ASSERT_NEAR(original_target, f.status.temperature_c, 0.001f);
+    SP_ASSERT_NEAR(change.setpoint_c, f.status.setpoint_c, 0.001f);
+    SP_ASSERT(!heatup_warning(&f));
+
+    /* The original deadline still applies: below, exactly at, and above it. */
+    heatup_step(&f, &none, 1U);
+    SP_ASSERT(!heatup_warning(&f));
+    heatup_step(&f, &none, 1U);
+    SP_ASSERT_EQ_INT(HEATUP_BIT, f.status.alarms_active);
+    SP_ASSERT_EQ_INT(0, f.status.alarms_latched & HEATUP_BIT);
+    SP_ASSERT_EQ_INT(BOILER_STATE_RUNNING, f.status.state);
+    SP_ASSERT_EQ_INT(0, f.outputs.alarm_horn);
+}
+
+SP_TEST(heatup_lowered_setpoint_completion_boundaries_and_no_rearm, "REQ-042")
+{
+    const float offsets[] = {-0.1f, 0.0f, 0.1f};
+
+    for (unsigned already_overdue = 0; already_overdue < 2; ++already_overdue) {
+        for (unsigned i = 0; i < sizeof offsets / sizeof offsets[0]; ++i) {
+            BoilerFixture f;
+            BoilerCommands change = {.set_setpoint = 1};
+            float original_target;
+            float lowered_target;
+
+            SP_ASSERT_EQ_INT(SP_OK, heatup_start(&f, HEATUP_TIMEOUT_MS));
+            original_target = f.status.setpoint_c;
+            lowered_target = original_target - 1.0f;
+            SP_ASSERT(lowered_target >= f.controller.config.setpoint_min_c);
+            heatup_advance(&f, HEATUP_TIMEOUT_MS + already_overdue);
+            SP_ASSERT_EQ_INT(already_overdue != 0, heatup_warning(&f));
+
+            /* Lower the target on the first overdue step or with a standing warning. */
+            fixture_set_temperature(&f, lowered_target + offsets[i]);
+            change.setpoint_c = lowered_target;
+            heatup_step(&f, &change, 1U);
+            SP_ASSERT_EQ_INT(1, f.status.temperature_valid);
+            SP_ASSERT_NEAR(lowered_target + offsets[i], f.status.temperature_c, 0.001f);
+            SP_ASSERT_NEAR(lowered_target, f.status.setpoint_c, 0.001f);
+            SP_ASSERT_EQ_INT(offsets[i] < 0.0f, heatup_warning(&f));
+            SP_ASSERT_EQ_INT(0, f.status.alarms_latched & HEATUP_BIT);
+            SP_ASSERT_EQ_INT(BOILER_STATE_RUNNING, f.status.state);
+            SP_ASSERT_EQ_INT(0, f.outputs.alarm_horn);
+
+            if (offsets[i] >= 0.0f) {
+                /* Raising the target after completion must not begin another heat-up. */
+                fixture_set_temperature(&f, 20.0f);
+                change.setpoint_c = original_target;
+                heatup_step(&f, &change, 1U);
+                fixture_follow_outputs(&f);
+                SP_ASSERT_NEAR(original_target, f.status.setpoint_c, 0.001f);
+                SP_ASSERT(!heatup_warning(&f));
+                heatup_advance(&f, HEATUP_TIMEOUT_MS + 1U);
+                SP_ASSERT_EQ_INT(BOILER_STATE_RUNNING, f.status.state);
+                SP_ASSERT(!heatup_warning(&f));
+            }
+        }
+    }
+}
