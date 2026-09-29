@@ -61,6 +61,10 @@ def _add_protected(ai: AIProject, context: Context) -> None:
     context.add("protected (generated) files", "\n".join(ai.protected))
 
 
+def _add_generated_headers(ai: AIProject, context: Context) -> None:
+    context.add_files([p for p in ai.protected_paths() if p.suffix == ".h"], "generated, read-only")
+
+
 def _next_requirement_id(trace: Trace) -> str:
     numbers = [int(r.id.split("-")[1]) for r in trace.requirements]
     return f"REQ-{max(numbers, default=0) + 1:03d}"
@@ -113,7 +117,7 @@ def build_model(ai, trace, context, requirement_id, options) -> str:
 def build_code(ai, trace, context, requirement_id, options) -> str:
     _add_requirement_with_links(ai, trace, context, requirement_id)
     context.add_files(ai.files("code"), "controller")
-    context.add_files([p for p in ai.protected_paths() if p.suffix == ".h"], "generated, read-only")
+    _add_generated_headers(ai, context)
     _add_protected(ai, context)
     return (
         f"Implement {requirement_id} in the controller. Keep the controller deterministic: "
@@ -132,6 +136,7 @@ def build_tests(ai, trace, context, requirement_id, options) -> str:
         "test fixtures",
     )
     context.add_files([p for p in ai.files("tests") if p.name == "CMakeLists.txt"], "test build")
+    _add_generated_headers(ai, context)
     harness = ai.repo / "sparrow" / "testing" / "sp_test.h"
     context.add_file(harness, "C test harness")
     return (
@@ -233,6 +238,7 @@ def build_explain(ai, trace, context, results_glob, options) -> str:
             context.add_file(test.path, "failing test")
             for requirement_id in test.requirements:
                 _add_requirement_with_links(ai, trace, context, requirement_id)
+    _add_generated_headers(ai, context)
     return (
         "Explain why these tests fail. For each failure say whether the test, the "
         "implementation or the requirement is wrong, citing the lines that show it, and "
