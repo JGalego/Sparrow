@@ -42,6 +42,7 @@ lint:
 	ruff format --check .
 	clang-format --dry-run --Werror $(SOURCES_C)
 	cppcheck --quiet --error-exitcode=1 --enable=warning,portability \
+		-D__ORDER_LITTLE_ENDIAN__=1234 -D__BYTE_ORDER__=1234 \
 		--suppress=missingIncludeSystem --inline-suppr -I sparrow/core \
 		-I examples/smart-boiler/generated -I examples/smart-boiler/controller \
 		sparrow/core examples/smart-boiler/controller examples/smart-boiler/generated
