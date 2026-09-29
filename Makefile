@@ -8,7 +8,7 @@ BUILD_DIR := build/$(PRESET)
 SOURCES_C := $(shell git ls-files '*.c' '*.h' | grep -v '/generated/')
 PROJECT := examples/smart-boiler/sparrow.yaml
 
-.PHONY: setup build test test-asan run lint format trace gen screenshots clean
+.PHONY: setup build test test-asan run run-sil lint format trace gen screenshots clean
 
 setup:
 	python3 -m venv $(VENV)
@@ -36,6 +36,9 @@ test-asan:
 
 run: build
 	scripts/run-desktop.sh
+
+run-sil: build
+	scripts/run-sil.sh
 
 lint:
 	ruff check .

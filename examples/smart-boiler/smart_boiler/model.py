@@ -99,6 +99,8 @@ class FrameKind(IntEnum):
     STATUS = 1
     COMMANDS = 2
     FAULT_INJECTION = 3
+    INPUTS = 4
+    OUTPUTS = 5
 
 
 class BoilerInputs(ctypes.Structure):

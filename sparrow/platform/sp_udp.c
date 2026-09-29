@@ -28,6 +28,18 @@ SpStatus sp_udp_open(SpUdp *udp, const char *host, uint16_t listen_port, uint16_
     return SP_OK;
 }
 
+SpStatus sp_udp_set_peer(SpUdp *udp, const char *host, uint16_t port)
+{
+    struct in_addr address;
+
+    if (inet_pton(AF_INET, host, &address) != 1) {
+        return SP_ERR_ARGUMENT;
+    }
+    udp->peer_address = address.s_addr;
+    udp->peer_port = htons(port);
+    return SP_OK;
+}
+
 SpStatus sp_udp_send(const SpUdp *udp, const void *data, size_t size)
 {
     const struct sockaddr_in peer = {

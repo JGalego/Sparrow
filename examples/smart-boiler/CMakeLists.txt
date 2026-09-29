@@ -27,6 +27,14 @@ add_library(boiler_controller_shared SHARED controller/boiler_capi.c)
 target_link_libraries(boiler_controller_shared PRIVATE boiler_controller)
 set_target_properties(boiler_controller_shared PROPERTIES OUTPUT_NAME boiler_controller)
 
+# Controller runtime for the target: fixed-period loop, UDP plant I/O, HMI link.
+add_library(boiler_runtime_parts STATIC runtime/boiler_commands.c runtime/boiler_io_udp.c)
+target_include_directories(boiler_runtime_parts PUBLIC runtime)
+target_link_libraries(boiler_runtime_parts PUBLIC boiler_model sparrow_rt)
+add_executable(boiler_runtime runtime/main.c)
+target_link_libraries(boiler_runtime PRIVATE boiler_runtime_parts boiler_controller)
+install(TARGETS boiler_runtime RUNTIME DESTINATION bin)
+
 if(SPARROW_BUILD_HMI)
     add_executable(boiler_hmi
         hmi/boiler_process_view.c
@@ -34,6 +42,7 @@ if(SPARROW_BUILD_HMI)
         hmi/boiler_sim_panel.c
         hmi/main.c)
     target_link_libraries(boiler_hmi PRIVATE boiler_hmi_model sparrow_hmi sparrow_platform)
+    install(TARGETS boiler_hmi RUNTIME DESTINATION bin)
 endif()
 
 if(SPARROW_BUILD_TESTS)

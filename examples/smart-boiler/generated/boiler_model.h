@@ -161,6 +161,8 @@ typedef enum {
     BOILER_FRAME_STATUS = 1,
     BOILER_FRAME_COMMANDS = 2,
     BOILER_FRAME_FAULT_INJECTION = 3,
+    BOILER_FRAME_INPUTS = 4,
+    BOILER_FRAME_OUTPUTS = 5,
 } BoilerFrameKind;
 
 typedef enum {

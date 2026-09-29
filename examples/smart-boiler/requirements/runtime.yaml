@@ -1,0 +1,78 @@
+# Requirements on the controller runtime (runtime/main.c), the process that
+# runs the controller on the target.
+requirements:
+  - id: REQ-022
+    title: Operator commands between control steps
+    statement: >
+      The runtime shall combine all operator commands received since the
+      previous control step into the commands of the next step: request flags
+      are set once however often they were received, the latest setpoint and
+      manual requests replace earlier ones, and a stop cancels any start
+      received in the same interval.
+    rationale: >
+      The HMI and the controller run at different rates. Commands must not be
+      lost between steps, and a stop must not be overridden by a start sent
+      a moment earlier or later.
+    component: runtime
+    priority: must
+    verification: test
+    implementation:
+      - runtime/boiler_commands.c::boiler_commands_merge
+
+  - id: REQ-023
+    title: Reaction to lost field I/O
+    statement: >
+      When the I/O backend has no inputs newer than the stale limit (default
+      500 ms), the runtime shall pass open-loop inputs (all loop currents
+      0 mA, pump feedback off) to the controller, which then raises sensor
+      faults and enters FAULT. Before the backend has delivered its first
+      fresh inputs, the runtime shall not step the controller and shall hold
+      every actuator de-energized. On shutdown the runtime shall write outputs
+      with every actuator de-energized.
+    rationale: >
+      Repeating the last good inputs would hide a dead link and let the
+      heater run on old data. Open loops drive the existing sensor-fault
+      path, so lost I/O needs no second fault-handling mechanism. Waiting for
+      the first inputs keeps a plant or I/O driver that starts after the
+      controller from latching faults at every boot.
+    component: runtime
+    priority: must
+    verification: test
+    implementation:
+      - runtime/boiler_io_udp.c::io_read
+      - runtime/boiler_io.h::boiler_io_open_loop
+      - runtime/main.c::run
+
+  - id: REQ-024
+    title: Watchdog supervision
+    statement: >
+      With a watchdog device configured, the runtime shall kick it once per
+      completed control step, and on a clean shutdown write the magic close
+      character before closing it.
+    rationale: >
+      A hung control loop then stops kicking and the hardware resets the
+      board. A deliberate stop does not.
+    component: runtime
+    priority: must
+    verification: test
+    implementation:
+      - ../../sparrow/platform/sp_watchdog.c::sp_watchdog_kick
+      - ../../sparrow/platform/sp_watchdog.c::sp_watchdog_close
+
+  - id: REQ-025
+    title: Control period
+    statement: >
+      The runtime shall run control steps at a fixed period (default 100 ms)
+      against absolute deadlines, pass the measured time since the previous
+      step to the controller, bounded to 10 periods, and count steps that
+      miss their deadline.
+    rationale: >
+      Controller timers such as debounce and travel timeouts must follow real
+      time. The bound keeps a long stall, for example after the process was
+      suspended, from expiring every timer at once.
+    component: runtime
+    priority: must
+    verification: test
+    implementation:
+      - ../../sparrow/platform/sp_period.c::sp_period_wait
+      - runtime/main.c::step_ms

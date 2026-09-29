@@ -22,23 +22,28 @@ SCENARIO_DIR = Path(__file__).resolve().parents[1] / "scenarios"
 COMMAND_FIELDS = {name for name, _ in BoilerCommands._fields_ if not name.startswith("reserved")}
 
 
+def apply_injection(target, payload: bytes) -> None:
+    """Applies a FAULT_INJECTION payload to anything with inject() and clear()."""
+    if len(payload) != ctypes.sizeof(BoilerFaultInjection):
+        return
+    request = BoilerFaultInjection.from_buffer_copy(payload)
+    try:
+        if request.action == 1:
+            target.inject(PlantFault(request.fault).name)
+        elif request.action == 0:
+            target.clear(PlantFault(request.fault).name)
+        elif request.action == 2:
+            target.clear()
+    except (ValueError, UnknownFault):
+        pass
+
+
 def apply_frame(bench: BoilerBench, frame: Frame) -> None:
     if frame.kind == FrameKind.COMMANDS and len(frame.payload) == ctypes.sizeof(BoilerCommands):
         commands = BoilerCommands.from_buffer_copy(frame.payload)
         bench.command(**{n: getattr(commands, n) for n in COMMAND_FIELDS if getattr(commands, n)})
-    elif frame.kind == FrameKind.FAULT_INJECTION and len(frame.payload) == ctypes.sizeof(
-        BoilerFaultInjection
-    ):
-        request = BoilerFaultInjection.from_buffer_copy(frame.payload)
-        try:
-            if request.action == 1:
-                bench.inject(PlantFault(request.fault).name)
-            elif request.action == 0:
-                bench.clear(PlantFault(request.fault).name)
-            elif request.action == 2:
-                bench.clear()
-        except (ValueError, UnknownFault):
-            pass
+    elif frame.kind == FrameKind.FAULT_INJECTION:
+        apply_injection(bench, frame.payload)
 
 
 def resolve_scenario(name: str) -> Path:

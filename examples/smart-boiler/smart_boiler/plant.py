@@ -63,6 +63,8 @@ class SensorRanges:
 NOISE_TEMPERATURE_C = 0.03
 NOISE_PRESSURE_BAR = 0.004
 NOISE_FLOW_LPM = 0.15
+# Flow transmitters report zero below their low-flow cut-off.
+FLOW_CUTOFF_LPM = 0.5
 
 
 class BoilerPlant(Plant):
@@ -126,6 +128,7 @@ class BoilerPlant(Plant):
                 ranges.flow_lpm,
                 NOISE_FLOW_LPM,
                 open_fault=PlantFault.FLOW_SENSOR_OPEN,
+                cutoff=FLOW_CUTOFF_LPM,
             ),
             "valve_position_ma": self._loop_current(
                 self.valve_position_pct,
@@ -215,6 +218,7 @@ class BoilerPlant(Plant):
         noise_amplitude: float,
         open_fault: PlantFault,
         short_fault: PlantFault | None = None,
+        cutoff: float | None = None,
     ) -> float:
         if open_fault in self._faults:
             return OPEN_LOOP_MA
@@ -222,6 +226,8 @@ class BoilerPlant(Plant):
             return SHORT_LOOP_MA
         low, high = span
         value += self._noise(noise_amplitude)
+        if cutoff is not None and value < cutoff:
+            value = 0.0
         return 4.0 + 16.0 * (value - low) / (high - low)
 
     @staticmethod

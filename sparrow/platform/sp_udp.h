@@ -16,6 +16,9 @@ typedef struct {
 /* Binds listen_port on the loopback or given IPv4 address and sets the peer. */
 SpStatus sp_udp_open(SpUdp *udp, const char *host, uint16_t listen_port, uint16_t peer_port);
 
+/* Changes the peer to another IPv4 address and port. */
+SpStatus sp_udp_set_peer(SpUdp *udp, const char *host, uint16_t port);
+
 /* Best effort: returns SP_OK even if nobody is listening. */
 SpStatus sp_udp_send(const SpUdp *udp, const void *data, size_t size);
 

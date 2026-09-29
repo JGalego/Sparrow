@@ -42,6 +42,17 @@
         "SPARROW_BUILD_TESTS": "OFF",
         "SPARROW_DISPLAY_BACKENDS": "fbdev"
       }
+    },
+    {
+      "name": "target-aarch64-test",
+      "displayName": "aarch64 controller and C tests, run under qemu-aarch64",
+      "binaryDir": "${sourceDir}/build/target-aarch64-test",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/aarch64-linux-gnu.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SPARROW_BUILD_HMI": "OFF",
+        "CMAKE_CROSSCOMPILING_EMULATOR": "qemu-aarch64;-L;/usr/aarch64-linux-gnu"
+      }
     }
   ],
   "buildPresets": [
@@ -60,6 +71,10 @@
     {
       "name": "target-aarch64",
       "configurePreset": "target-aarch64"
+    },
+    {
+      "name": "target-aarch64-test",
+      "configurePreset": "target-aarch64-test"
     }
   ],
   "testPresets": [
@@ -80,6 +95,13 @@
     {
       "name": "host-headless",
       "configurePreset": "host-headless",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "target-aarch64-test",
+      "configurePreset": "target-aarch64-test",
       "output": {
         "outputOnFailure": true
       }

@@ -96,11 +96,15 @@ structs:
       - {name: fault, type: u16, description: "BoilerPlantFault, 0 with action 2 clears all"}
       - {name: action, type: u8, description: "1 inject, 0 clear one, 2 clear all"}
 
-# Datagram kinds exchanged between simulator/controller and HMI.
+# Datagram kinds. STATUS, COMMANDS and FAULT_INJECTION travel between the
+# controller (or simulator) and the HMI; INPUTS and OUTPUTS between the
+# controller runtime and a plant simulated over the network.
 frames:
   - {name: STATUS, value: 1, struct: Status}
   - {name: COMMANDS, value: 2, struct: Commands}
   - {name: FAULT_INJECTION, value: 3, struct: FaultInjection}
+  - {name: INPUTS, value: 4, struct: Inputs}
+  - {name: OUTPUTS, value: 5, struct: Outputs}
 
 # Controller configuration. Defaults are compiled in; min/max are enforced by
 # boiler_config_check_ranges() before the controller starts.

@@ -198,3 +198,11 @@ def test_different_seeds_give_different_noise():
     assert [first.sensors()["temperature_ma"] for _ in range(5)] != [
         second.sensors()["temperature_ma"] for _ in range(5)
     ]
+
+
+def test_flow_transmitter_reads_zero_below_its_cutoff():
+    plant = BoilerPlant(BoilerParams(noise=True, seed=5))
+
+    readings = [ma_to_value(plant.sensors()["flow_ma"], 0.0, 100.0) for _ in range(200)]
+
+    assert all(r == 0.0 for r in readings)

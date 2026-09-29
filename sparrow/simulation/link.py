@@ -43,8 +43,10 @@ def decode(datagram: bytes) -> Frame | None:
 class Endpoint:
     """A bound UDP socket that sends frames to one peer and drains received frames."""
 
-    def __init__(self, listen_port: int, peer_port: int, host: str = "127.0.0.1"):
-        self._peer = (host, peer_port)
+    def __init__(
+        self, listen_port: int, peer_port: int, host: str = "127.0.0.1", peer_host: str = ""
+    ):
+        self._peer = (peer_host or host, peer_port)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.bind((host, listen_port))
