@@ -15,6 +15,8 @@ FetchContent_Declare(
     GIT_TAG v9.2.2
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(lvgl)
+# LVGL's Linux drivers (fbdev, evdev) need POSIX declarations hidden by strict ISO C.
+set_target_properties(lvgl PROPERTIES C_EXTENSIONS ON)
 
 if("sdl" IN_LIST SPARROW_DISPLAY_BACKENDS)
     find_package(SDL2 REQUIRED)
