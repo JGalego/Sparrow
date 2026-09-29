@@ -1,0 +1,8 @@
+name: sensor-failure
+description: >
+  The temperature transmitter loop opens while the boiler runs.
+plant:
+  initial_temperature_c: 78.0
+events:
+  - {at_s: 2, action: command, fields: {start: 1}}
+  - {at_s: 40, action: inject, fault: TEMP_SENSOR_OPEN}

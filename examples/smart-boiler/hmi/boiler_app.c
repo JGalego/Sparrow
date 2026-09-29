@@ -76,7 +76,7 @@ void boiler_app_tick(BoilerApp *app, uint32_t now_ms)
     if (!app->have_status || !app->link_up) {
         return;
     }
-    if (now_ms - app->last_frame_ms > BOILER_LINK_TIMEOUT_MS) {
+    if (now_ms > app->last_frame_ms && now_ms - app->last_frame_ms > BOILER_LINK_TIMEOUT_MS) {
         app->link_up = false;
         boiler_notify_add(&app->notifications, app->status.uptime_ms, SP_SEVERITY_WARNING,
                           "Link lost");

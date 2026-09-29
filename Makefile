@@ -8,7 +8,7 @@ BUILD_DIR := build/$(PRESET)
 SOURCES_C := $(shell git ls-files '*.c' '*.h' | grep -v '/generated/')
 PROJECT := examples/smart-boiler/sparrow.yaml
 
-.PHONY: setup build test run lint format trace gen screenshots clean
+.PHONY: setup build test test-asan run lint format trace gen screenshots clean
 
 setup:
 	python3 -m venv $(VENV)
@@ -20,9 +20,17 @@ build:
 
 test: build
 	ctest --preset $(PRESET)
-	pytest --junit-xml=$(BUILD_DIR)/results/python.xml
-	sparrow trace $(PROJECT) --check docs/traceability.md \
-		--results $(BUILD_DIR)/results/*.xml
+	SPARROW_BUILD_DIR=$(BUILD_DIR) pytest --junit-xml=$(BUILD_DIR)/results/python.xml
+	sparrow trace $(PROJECT) --results $(BUILD_DIR)/results/*.xml \
+		--write $(BUILD_DIR)/traceability.md
+	@echo "traceability with results: $(BUILD_DIR)/traceability.md"
+
+# C tests under AddressSanitizer and UBSan. Python cannot load the
+# instrumented controller library, so the pytest suites are not run here.
+test-asan:
+	cmake --preset host-asan
+	cmake --build --preset host-asan --parallel
+	ctest --preset host-asan
 
 run: build
 	scripts/run-desktop.sh

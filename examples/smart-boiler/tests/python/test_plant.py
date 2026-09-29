@@ -1,6 +1,7 @@
 import pytest
 from smart_boiler.model import PlantFault
 from smart_boiler.plant import BoilerParams, BoilerPlant
+
 from sparrow.simulation.plant import UnknownFault
 
 IDLE = {"heater_power_pct": 0.0, "heater_contactor": 0, "pump_run": 0, "valve_open": 0}

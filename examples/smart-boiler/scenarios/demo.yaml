@@ -1,0 +1,7 @@
+name: demo
+description: >
+  Warm boiler, operator starts it after two seconds and leaves it running.
+plant:
+  initial_temperature_c: 60.0
+events:
+  - {at_s: 2, action: command, fields: {start: 1}}

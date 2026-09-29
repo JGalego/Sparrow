@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- perch -->
+  <line x1="60" y1="216" x2="204" y2="216" stroke="#5A6675" stroke-width="7" stroke-linecap="round"/>
+  <!-- legs: tarsi angled slightly forward, pinkish-brown -->
+  <g stroke="#9C6B5E" stroke-width="5" stroke-linecap="round" fill="none">
+    <line x1="116" y1="164" x2="112" y2="211"/>
+    <line x1="138" y1="164" x2="140" y2="211"/>
+  </g>
+  <!-- tail: continues from the rump, angled down, notched tip -->
+  <polygon points="74,136 84,160 36,202 28,190 14,190" fill="#D93F45"/>
+  <!-- body -->
+  <ellipse cx="122" cy="132" rx="68" ry="41" transform="rotate(-20 122 132)" fill="#D93F45"/>
+  <!-- head -->
+  <circle cx="174" cy="88" r="30" fill="#D93F45"/>
+  <!-- pale throat and belly -->
+  <path d="M 186 110 Q 190 150 136 174 Q 118 176 104 170 Q 160 156 168 114 Z" fill="#F4A3A6"/>
+  <!-- folded wing: rounded shoulder at the front, primaries tapering back over the tail base -->
+  <path d="M 150 104 C 172 112 172 146 144 160 L 64 150 Q 98 112 150 104 Z" fill="#9E2227"/>
+  <path d="M 140 146 L 84 146 M 132 134 L 96 138" stroke="#D93F45" stroke-width="3" stroke-linecap="round"/>
+  <!-- short, conical seed-eater bill -->
+  <polygon points="200,78 218,90 200,98" fill="#F5B83D"/>
+  <line x1="201" y1="90" x2="214" y2="90" stroke="#B9862A" stroke-width="1.5"/>
+  <!-- eye, behind the bill base, above the gape line -->
+  <circle cx="183" cy="82" r="5.5" fill="#0D1218"/>
+  <circle cx="184.8" cy="80.4" r="1.7" fill="#FFFFFF"/>
+  <!-- feet gripping the perch: three toes forward, hallux behind -->
+  <g stroke="#9C6B5E" stroke-width="4" stroke-linecap="round" fill="none">
+    <path d="M 112 211 Q 122 209 127 216"/>
+    <path d="M 112 211 Q 104 211 102 217"/>
+    <path d="M 140 211 Q 150 209 155 216"/>
+    <path d="M 140 211 Q 132 211 130 217"/>
+  </g>
+</svg>

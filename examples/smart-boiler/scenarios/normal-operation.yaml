@@ -1,0 +1,8 @@
+name: normal-operation
+description: >
+  Start from a warm boiler, run at the default setpoint, raise the setpoint
+  later. Used for the reference screenshots.
+plant:
+  initial_temperature_c: 62.0
+events:
+  - {at_s: 2, action: command, fields: {start: 1}}

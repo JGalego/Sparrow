@@ -1,12 +1,18 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": {"major": 3, "minor": 20, "patch": 0},
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "host",
       "displayName": "Desktop Linux, SDL simulator",
       "binaryDir": "${sourceDir}/build/host",
-      "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
     },
     {
       "name": "host-asan",
@@ -39,13 +45,44 @@
     }
   ],
   "buildPresets": [
-    {"name": "host", "configurePreset": "host"},
-    {"name": "host-asan", "configurePreset": "host-asan"},
-    {"name": "host-headless", "configurePreset": "host-headless"},
-    {"name": "target-aarch64", "configurePreset": "target-aarch64"}
+    {
+      "name": "host",
+      "configurePreset": "host"
+    },
+    {
+      "name": "host-asan",
+      "configurePreset": "host-asan"
+    },
+    {
+      "name": "host-headless",
+      "configurePreset": "host-headless"
+    },
+    {
+      "name": "target-aarch64",
+      "configurePreset": "target-aarch64"
+    }
   ],
   "testPresets": [
-    {"name": "host", "configurePreset": "host", "output": {"outputOnFailure": true}},
-    {"name": "host-asan", "configurePreset": "host-asan", "output": {"outputOnFailure": true}}
+    {
+      "name": "host",
+      "configurePreset": "host",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "host-asan",
+      "configurePreset": "host-asan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "host-headless",
+      "configurePreset": "host-headless",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
   ]
 }

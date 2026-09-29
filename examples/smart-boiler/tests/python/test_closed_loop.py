@@ -145,7 +145,9 @@ def test_temperature_warning_precedes_the_trip(running_bench):
         ("VALVE_SENSOR_OPEN", Fault.VALVE_SENSOR),
     ],
 )
-def test_sensor_failure_is_detected_and_stops_the_heater(running_bench, plant_fault, controller_fault):
+def test_sensor_failure_is_detected_and_stops_the_heater(
+    running_bench, plant_fault, controller_fault
+):
     running_bench.inject(plant_fault)
 
     running_bench.run(2)

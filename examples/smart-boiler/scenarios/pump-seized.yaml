@@ -1,0 +1,9 @@
+name: pump-seized
+description: >
+  The pump seizes while its contactor stays closed. Only the flow
+  measurement shows it.
+plant:
+  initial_temperature_c: 78.0
+events:
+  - {at_s: 2, action: command, fields: {start: 1}}
+  - {at_s: 40, action: inject, fault: PUMP_SEIZED}

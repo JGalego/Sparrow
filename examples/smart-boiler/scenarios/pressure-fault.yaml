@@ -1,0 +1,9 @@
+name: pressure-fault
+description: >
+  The expansion vessel fails. Pressure rises with temperature, warns at
+  3.5 bar and trips at 4.0 bar.
+plant:
+  initial_temperature_c: 40.0
+events:
+  - {at_s: 0, action: inject, fault: EXPANSION_VESSEL_FAILED}
+  - {at_s: 2, action: command, fields: {start: 1}}

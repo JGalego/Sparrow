@@ -8,3 +8,4 @@ __pycache__/
 sparrow.local.toml
 *.local.yaml
 .env
+*.whl

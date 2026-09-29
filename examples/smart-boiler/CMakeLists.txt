@@ -27,6 +27,15 @@ add_library(boiler_controller_shared SHARED controller/boiler_capi.c)
 target_link_libraries(boiler_controller_shared PRIVATE boiler_controller)
 set_target_properties(boiler_controller_shared PROPERTIES OUTPUT_NAME boiler_controller)
 
+if(SPARROW_BUILD_HMI)
+    add_executable(boiler_hmi
+        hmi/boiler_process_view.c
+        hmi/boiler_screen.c
+        hmi/boiler_sim_panel.c
+        hmi/main.c)
+    target_link_libraries(boiler_hmi PRIVATE boiler_hmi_model sparrow_hmi sparrow_platform)
+endif()
+
 if(SPARROW_BUILD_TESTS)
     add_subdirectory(tests/c)
 endif()
