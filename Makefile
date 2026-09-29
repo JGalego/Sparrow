@@ -5,7 +5,7 @@ VENV := $(CURDIR)/.venv
 export PATH := $(VENV)/bin:$(PATH)
 PRESET ?= host
 BUILD_DIR := build/$(PRESET)
-SOURCES_C := $(shell git ls-files '*.c' '*.h' | grep -v '/generated/')
+SOURCES_C := $(shell git ls-files --cached --others --exclude-standard '*.c' '*.h' | grep -v '/generated/')
 PROJECT := examples/smart-boiler/sparrow.yaml
 
 .PHONY: setup build test test-asan run run-sil lint format trace gen screenshots clean
