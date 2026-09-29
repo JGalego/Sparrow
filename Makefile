@@ -12,7 +12,7 @@ PROJECT := examples/smart-boiler/sparrow.yaml
 
 setup:
 	python3 -m venv $(VENV)
-	$(VENV)/bin/pip install -e '.[dev]'
+	$(VENV)/bin/pip install -e '.[dev,ai]'
 
 build:
 	cmake --preset $(PRESET)

@@ -7,3 +7,21 @@ tests:
   - tests/c
   - tests/python
   - ../../tests/core
+
+# Optional AI assistance (`sparrow ai`). Paths are the only files each task may
+# change; gates are the commands `--verify` runs, from the repository root,
+# after applying a proposal.
+ai:
+  paths:
+    requirements: [requirements/*.yaml]
+    model: [model/*.yaml]
+    code: [controller/*.c, controller/*.h]
+    tests: [tests/c/*.c, tests/c/*.h, tests/c/CMakeLists.txt, tests/python/*.py]
+    hmi: [hmi/*.c, hmi/*.h, CMakeLists.txt, ../../sparrow/hmi/*.c, ../../sparrow/hmi/*.h, ../../sparrow/hmi/CMakeLists.txt]
+    docs: [../../README.md, ../../docs/*.md]
+  protected:
+    - ../../docs/traceability.md
+  gates:
+    - make gen
+    - make lint
+    - make test

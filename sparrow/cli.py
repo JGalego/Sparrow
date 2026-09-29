@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .ai.cli import add_parser as add_ai_parser
 from .codegen.generate import generate
 from .codegen.model import ModelError
 from .requirements.report import render, render_requirement
@@ -82,6 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--file", metavar="PATH", help="list the requirements a source file implements"
     )
     trace.set_defaults(handler=_cmd_trace)
+
+    add_ai_parser(commands)
     return parser
 
 

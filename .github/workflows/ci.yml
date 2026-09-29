@@ -17,7 +17,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build cppcheck libsdl2-dev
-          python -m pip install -e '.[dev]'
+          python -m pip install -e '.[dev,ai]'
       - name: Build and test
         run: make test PRESET=host-headless
       - name: C tests with sanitizers
@@ -34,6 +34,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cppcheck
-          python -m pip install -e '.[dev]'
+          python -m pip install -e '.[dev,ai]'
       - name: Lint
         run: make lint

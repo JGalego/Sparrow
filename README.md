@@ -85,9 +85,25 @@ sparrow trace examples/smart-boiler/sparrow.yaml --requirement REQ-006
 
 ## Where AI fits in
 
-AI helps in steps 1 to 5. It drafts requirements, model changes, controller code and tests, and it explains test failures. Its output is an ordinary Git diff that must pass the same gates as a human change: `sparrow gen --check`, the build, the tests and `sparrow trace`. A person reviews it before it merges.
+`sparrow ai` drafts the artifacts of steps 1 to 5 and reviews what comes out of steps 5 and 7. It works with Anthropic, OpenAI, and OpenAI-compatible servers such as Ollama or Groq:
 
-AI is never part of the build, the tests, the simulator or the deployed control loop. Everything in this repository works without an API key. The assistant and its provider adapters (OpenAI, Anthropic and OpenAI-compatible endpoints such as Ollama or Groq) are not in the repository yet.
+```sh
+pip install -e '.[ai]'
+cp ai.example.yaml sparrow-ai.local.yaml      # pick a profile; keys stay in env vars
+export SPARROW_PROJECT=examples/smart-boiler/sparrow.yaml
+
+sparrow ai requirements "Warn if heat-up takes longer than 20 minutes"   # 1
+sparrow ai model REQ-042                                                  # 2
+sparrow ai code REQ-042                                                   # 4
+sparrow ai tests REQ-042 --verify                                         # 5, then gates
+sparrow ai explain                                                        # failing tests
+sparrow ai analyze run.csv --requirement REQ-012                          # 7, simulation trace
+sparrow ai review main                                                    # before merging
+```
+
+The traceability data selects the context: the requirement, the code that implements it, and the tests that cite it. Each draft comes back as a patch limited to the files its stage may change. With `--verify`, it is applied and must pass the same gates as a human change: `sparrow gen`, lint, the tests and `sparrow trace`. A person reviews it before it merges.
+
+AI is never part of the build, the tests, the simulator or the deployed control loop, and everything else in this repository works without it. Configuration, providers and every stage are covered in [docs/ai.md](docs/ai.md).
 
 ## Philosophy
 
