@@ -126,6 +126,7 @@ def test_proposal_is_validated_saved_and_not_applied_by_default(project):
     assert {p.suffix for p in outcome.saved} == {".patch", ".json"}
     assert "x > 10" in (project.repo / "app/src/limit.c").read_text()
     assert provider.calls[0][2]["required"] == ["summary", "rationale", "edits"]
+    assert outcome.usage == [("scripted", 0, 0)]
 
 
 def test_apply_and_verify_run_the_gates(project):

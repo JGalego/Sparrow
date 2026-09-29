@@ -39,6 +39,7 @@ class Outcome:
     gates: list[GateResult] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     applied: bool = False
+    usage: list[tuple[str, int, int]] = field(default_factory=list)  # (model, in, out) per request
 
     @property
     def gates_passed(self) -> bool:
@@ -90,16 +91,18 @@ def run_task(
     schema = PROPOSAL_SCHEMA if task.kind == "proposal" else REPORT_SCHEMA
     messages = [Message("user", user)]
     notes: list[str] = []
+    usage: list[tuple[str, int, int]] = []
     for attempt in range(1, attempts + 1):
         completion = provider.complete(SYSTEM, messages, schema, on_text=_progress)
         sys.stderr.write("\n")
         notes += completion.notes
+        usage.append((completion.model, completion.input_tokens, completion.output_tokens))
         try:
             if task.kind == "report":
                 report = parse_report(completion.text)
                 text = render_report(report)
                 saved = _save(ai, task, {".md": text})
-                return Outcome(task.name, text, saved, notes=notes)
+                return Outcome(task.name, text, saved, notes=notes, usage=usage)
             proposal = parse_proposal(completion.text)
             changes = resolve(proposal, ai.repo, _policy(ai, task))
             break
@@ -120,7 +123,7 @@ def run_task(
     saved = _save(
         ai, task, {".patch": diff, ".json": json.dumps(parse_json_reply(completion.text), indent=2)}
     )
-    outcome = Outcome(task.name, header + diff, saved, proposal, notes=notes)
+    outcome = Outcome(task.name, header + diff, saved, proposal, notes=notes, usage=usage)
     if apply_changes:
         apply(changes)
         outcome.applied = True

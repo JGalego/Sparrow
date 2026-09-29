@@ -88,6 +88,8 @@ def _cmd_task(args: argparse.Namespace) -> int:
     )
     for note in outcome.notes:
         print(f"note: {note}", file=sys.stderr)
+    for index, (model, tokens_in, tokens_out) in enumerate(outcome.usage, 1):
+        print(f"request {index}: {model}, {tokens_in} tokens in, {tokens_out} out", file=sys.stderr)
     print(outcome.text)
     for path in outcome.saved:
         print(f"saved {path.relative_to(ai.repo)}", file=sys.stderr)
