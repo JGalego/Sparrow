@@ -329,9 +329,9 @@ requirements:
       to STARTUP, including time spent in STARTUP and RUNNING. Heat-up shall
       complete on the first control step with a valid temperature reading at
       or above the active setpoint. If heat-up remains incomplete for more than
-      1,200,000 ms (20 minutes), the controller shall raise a non-latching
-      warning in that control step. It shall not raise the warning at exactly
-      1,200,000 ms. Completion shall take precedence over timeout when both
+      heatup_timeout_ms (default 1,200,000 ms, 20 minutes), the controller
+      shall raise a non-latching warning in that control step. It shall not
+      raise the warning at exactly heatup_timeout_ms. Completion shall take precedence over timeout when both
       occur in the same step. An invalid temperature reading shall not count
       as completion and shall not pause the timer. Setpoint changes shall
       update the completion target without restarting the timer. The warning
