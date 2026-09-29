@@ -320,3 +320,34 @@ requirements:
     implementation:
       - controller/boiler_controller.c::boiler_config_validate
       - generated/boiler_model.c::boiler_config_check_ranges
+
+  - id: REQ-042
+    title: Heat-up timeout warning
+    statement: >
+      On accepting a start request in STANDBY, the controller shall begin
+      monitoring heat-up, measuring elapsed controller time from the transition
+      to STARTUP, including time spent in STARTUP and RUNNING. Heat-up shall
+      complete on the first control step with a valid temperature reading at
+      or above the active setpoint. If heat-up remains incomplete for more than
+      1,200,000 ms (20 minutes), the controller shall raise a non-latching
+      warning in that control step. It shall not raise the warning at exactly
+      1,200,000 ms. Completion shall take precedence over timeout when both
+      occur in the same step. An invalid temperature reading shall not count
+      as completion and shall not pause the timer. Setpoint changes shall
+      update the completion target without restarting the timer. The warning
+      shall clear on completion or on leaving STARTUP or RUNNING for any other
+      state. Once completed or cancelled, monitoring shall remain inactive
+      until another start request is accepted in STANDBY. This warning shall
+      not change the controller state or actuator commands.
+    rationale: >
+      Slow heat-up can indicate inadequate heater capacity or excessive heat
+      loss without requiring a shutdown. Including startup time detects an
+      excessively long wait for circulation as well as slow heating. Existing
+      critical faults and interlocks remain authoritative. A subsequent model
+      task should add heatup_timeout_ms, a u32 duration in milliseconds with
+      default 1200000, to make the timeout configurable; no existing config
+      parameter represents this duration.
+    component: controller
+    priority: should
+    verification: test
+    implementation: []
