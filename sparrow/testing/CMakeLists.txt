@@ -12,4 +12,5 @@ function(sparrow_add_c_test name)
     target_link_libraries(${name} PRIVATE sparrow_test ${TEST_LIBRARIES})
     add_test(NAME ${name}
              COMMAND ${name} --junit ${CMAKE_BINARY_DIR}/results/${name}.xml)
+    set_tests_properties(${name} PROPERTIES TIMEOUT 60)
 endfunction()

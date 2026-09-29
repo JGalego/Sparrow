@@ -14,92 +14,99 @@
 
 </div>
 
-Sparrow is an open-source framework for building embedded control systems with graphical HMIs, from requirements to a running target.
+Sparrow is an open-source framework for building embedded control systems with graphical HMIs, from requirements to a running target. Its reference application is a Smart Boiler.
 
 ![](docs/assets/hmi-normal.png)
 
-One YAML model defines the interfaces: signals, states, faults, configuration and wire frames. Sparrow generates the C and Python code for them. The controller is plain C with an explicit state machine and a fixed-step `step(inputs, commands, dt) -> outputs` function. A Python plant model with fault injection drives it in closed loop on a workstation. An LVGL HMI renders its status on the desktop or on an embedded Linux framebuffer. Requirements are YAML files that tests cite by ID, and `sparrow trace` checks both sides.
+## From idea to boiler
+
+Every feature takes the same path. Each step produces a plain-text artifact in Git and is checked by a deterministic tool. The boiler's over-temperature trip went through it like this:
 
 ```mermaid
 flowchart LR
-    model[model/boiler.yaml] -->|sparrow gen| gen[C headers<br>Python ctypes]
-    reqs[requirements/*.yaml] -->|sparrow trace| trace[traceability report]
-    gen --> ctrl[Controller<br>C, no I/O]
-    gen --> plant[Plant model<br>Python]
-    gen --> hmi[HMI<br>C + LVGL]
-    plant <-->|inputs / outputs| ctrl
-    ctrl -->|status frames, UDP| hmi
-    hmi -->|operator commands| ctrl
-    tests[C + pytest suites] --> trace
-    tests -.-> ctrl & plant
+    idea([Idea]) --> req[Requirement<br>YAML]
+    req --> model[Model<br>YAML]
+    model -->|sparrow gen| iface[Interfaces<br>C + Python]
+    iface --> code[Controller<br>C]
+    code --> tests[Tests<br>C + pytest]
+    tests --> sim[Simulation<br>plant + HMI]
+    sim --> review([Human review]) --> deploy([Target])
+    ai{{AI assistant}} -.drafts.-> req & model & code & tests
+    tests -.failures.-> ai
 ```
 
-The controller has no dependency on the HMI, the plant or the network. It never allocates memory, reads a clock or keeps global state, so the same inputs give the same outputs on the desktop, in CI and on the target. AI tooling is optional and never part of the deployed control loop.
+**1. Requirement.** The behaviour is stated with its reason and the parameters it depends on ([requirements/controller.yaml](examples/smart-boiler/requirements/controller.yaml)):
 
-## Smart Boiler
-
-The reference application is a pressurized hot-water boiler with a heater, a circulation pump, a motorized valve and four 4-20 mA transmitters. The controller sequences startup and shutdown, regulates temperature with a PI loop, and supervises 12 fault conditions. It trips to a safe state on over-temperature, over-pressure, low pressure, pump, flow, valve and sensor failures.
-
-A welded heater relay drives the temperature past the 100 °C warning:
-
-![](docs/assets/hmi-warning.png)
-
-At 110.1 °C the controller opens the heater contactor, latches the alarm and keeps the pump circulating while the boiler cools:
-
-![](docs/assets/hmi-fault.png)
-
-A seized pump still reports "running" on its contactor. Only the flow measurement reveals it:
-
-![](docs/assets/hmi-pump-fault.png)
-
-In the desktop simulator, the SIM panel injects any modelled plant fault at run time:
-
-![](docs/assets/hmi-sim-panel.png)
-
-## Repository
-
-| Path | Contents |
-|---|---|
-| `sparrow/core` | C: alarms, persistence timers, PI regulator, history ring, frame codec |
-| `sparrow/hmi` | C: LVGL theme and reusable widgets (gauge, trend, pill, panel, notifications) |
-| `sparrow/platform` | C: display backends (SDL, framebuffer, headless), UDP, screenshots |
-| `sparrow/codegen`, `sparrow/requirements`, `sparrow/simulation` | Python: `sparrow gen`, `sparrow trace`, plant interface, scenarios, link |
-| `examples/smart-boiler` | The boiler: model, requirements, controller, HMI, plant, scenarios, tests |
-
-## Quick start
-
-Requirements: Linux, CMake 3.20+, a C11 compiler, Python 3.10+, SDL2 development headers (`libsdl2-dev`) and Git. The first configure downloads LVGL v9.2.2.
-
-```sh
-make setup    # Python virtual environment with the sparrow tools
-make build    # controller, HMI and tests (build/host)
-make run      # simulator + desktop HMI
+```yaml
+- id: REQ-006
+  title: Over-temperature trip
+  statement: >
+    When the boiler temperature exceeds temperature_trip_c the controller shall,
+    in the same control step, open the heater contactor, set the heater power
+    to zero, latch the over-temperature alarm and enter FAULT.
+  parameters: [temperature_trip_c, temperature_hysteresis_c]
 ```
 
-`make run` passes extra options to the simulator through `scripts/run-desktop.sh`. For example, `scripts/run-desktop.sh --scenario over-temperature --speed 10` replays a fault scenario at 10x speed.
+**2. Model.** The fault and its limit become part of the interface ([model/boiler.yaml](examples/smart-boiler/model/boiler.yaml)):
 
-## Testing
-
-```sh
-make test         # C unit tests, closed-loop pytest suites, traceability with results
-make test-asan    # C tests under AddressSanitizer and UBSan
-make lint         # ruff, clang-format, cppcheck, stale generated code, stale trace
+```yaml
+faults:
+  - {name: OVER_TEMP, severity: critical, text: Over-temperature trip, requirement: REQ-006}
+config:
+  - {name: temperature_trip_c, default: 110.0, min: 30.0, max: 200.0, unit: degC}
 ```
 
-Every limit is tested at its boundary. With the 110.0 °C trip, 109.9 and 110.0 do not trip and 110.1 does. To see what verifies a requirement:
+**3. Interfaces.** `sparrow gen` writes the C structs, enums and config defaults for the controller and HMI, and the matching ctypes module for the plant. `make lint` fails if the committed files are stale.
+
+**4. Code.** The controller is plain C with one entry point, `boiler_step(inputs, commands, dt_ms) -> outputs`. It has no I/O, no clock and no allocation.
+
+**5. Tests.** Tests cite the requirement they verify. Limits are tested at the boundary, and fault behaviour is tested in closed loop against the plant model:
+
+```c
+SP_TEST(over_temperature_trips_above_the_limit, "REQ-006") { ... }   /* 109.9, 110.0, 110.1 */
+```
+
+```python
+@pytest.mark.verifies("REQ-006,REQ-016")
+def test_shorted_heater_relay_is_stopped_by_the_over_temperature_trip(running_bench): ...
+```
+
+**6. Trace.** `sparrow trace` joins requirements, implementation and tests, and fails on a requirement that no test verifies, a test that cites an unknown ID, or an implementation reference that no longer exists. The full matrix is in [docs/traceability.md](docs/traceability.md).
 
 ```sh
 sparrow trace examples/smart-boiler/sparrow.yaml --requirement REQ-006
 ```
 
-The full matrix of requirements, implementation and tests is in [docs/traceability.md](docs/traceability.md).
+**7. Simulation.** The desktop simulator runs the real controller library against the plant and streams its status to the HMI. Scenarios replay faults on a schedule, and the SIM panel injects them by hand. `scripts/run-desktop.sh --scenario over-temperature --speed 10` shows the trip happen:
 
-## Embedded Linux
+![](docs/assets/hmi-fault.png)
 
-The `target-aarch64` preset cross-compiles the controller and HMI for 64-bit ARM boards such as the NXP i.MX 8. It uses the Linux framebuffer with an evdev touchscreen, and nothing in the code depends on NXP hardware.
+**8. Deployment.** The same controller and HMI sources cross-compile for embedded Linux (`target-aarch64`, framebuffer and touchscreen). The reference target is NXP i.MX 8 class hardware, but no code depends on it.
+
+## Where AI fits in
+
+AI helps in steps 1 to 5. It drafts requirements, model changes, controller code and tests, and it explains test failures. Its output is an ordinary Git diff that must pass the same gates as a human change: `sparrow gen --check`, the build, the tests and `sparrow trace`. A person reviews it before it merges.
+
+AI is never part of the build, the tests, the simulator or the deployed control loop. Everything in this repository works without an API key. The assistant and its provider adapters (OpenAI, Anthropic and OpenAI-compatible endpoints such as Ollama or Groq) are not in the repository yet.
+
+## Philosophy
+
+- **Determinism.** The controller's outputs depend only on its configuration, its inputs and the step length. A test run on a laptop behaves exactly like the target.
+- **Explicit artifacts.** Requirements, interfaces, faults and scenarios are human-readable files. Nothing important lives in a tool's database or a prompt history.
+- **Separation.** Specification, controller, plant, HMI and platform code are separate modules. Any one of them can be replaced or used on its own.
+- **Workstation first.** The whole loop runs on a Linux desktop before any hardware is involved.
+- **Boring technology.** C11, CMake, Python, pytest, LVGL and YAML.
+
+## Quick start
+
+Requirements: Linux, CMake 3.20+, a C11 compiler, Python 3.10+, SDL2 headers (`libsdl2-dev`) and Git. The first configure downloads LVGL v9.2.2.
 
 ```sh
-cmake --preset target-aarch64 && cmake --build --preset target-aarch64
+make setup    # Python virtual environment with the sparrow tools
+make build    # controller, HMI and tests
+make run      # simulator + desktop HMI
+make test     # C unit tests, closed-loop tests, traceability with results
+make lint     # ruff, clang-format, cppcheck, stale generated code and trace
 ```
 
 ## License

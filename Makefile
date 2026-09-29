@@ -27,10 +27,12 @@ test: build
 
 # C tests under AddressSanitizer and UBSan. Python cannot load the
 # instrumented controller library, so the pytest suites are not run here.
+# ASLR is disabled for the test processes: GCC 12/13 sanitizer runtimes crash
+# at random on kernels with high mmap randomization (vm.mmap_rnd_bits = 32).
 test-asan:
 	cmake --preset host-asan
 	cmake --build --preset host-asan --parallel
-	ctest --preset host-asan
+	setarch -R ctest --preset host-asan
 
 run: build
 	scripts/run-desktop.sh
