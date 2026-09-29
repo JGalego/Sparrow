@@ -14,7 +14,9 @@ typedef struct {
 } SpWatchdog;
 
 SpStatus sp_watchdog_open(SpWatchdog *watchdog, const char *path);
-void sp_watchdog_kick(const SpWatchdog *watchdog);
-void sp_watchdog_close(SpWatchdog *watchdog);
+/* Returns SP_ERR_IO if the device rejected the kick; SP_OK without a device. */
+SpStatus sp_watchdog_kick(const SpWatchdog *watchdog);
+/* Returns SP_ERR_IO if the magic close failed; the watchdog then stays armed. */
+SpStatus sp_watchdog_close(SpWatchdog *watchdog);
 
 #endif

@@ -113,9 +113,12 @@ static void draw_vessel(lv_layer_t *layer, const lv_area_t *origin, const Boiler
     lv_area_t clipped;
 
     fill_rect(layer, &vessel, VESSEL_RADIUS, lv_color_hex(0x10161D), LV_OPA_COVER);
-    if (m->temperature.valid && _lv_area_intersect(&clipped, &saved_clip, &water_clip)) {
+    if (_lv_area_intersect(&clipped, &saved_clip, &water_clip)) {
         layer->_clip_area = clipped;
-        fill_rect(layer, &inner, VESSEL_RADIUS - 3, water_color(m->temperature.value), LV_OPA_80);
+        /* The level is not measured; an unknown temperature only greys the water. */
+        const lv_color_t water = m->temperature.valid ? water_color(m->temperature.value)
+                                                      : sp_severity_color(SP_SEVERITY_INACTIVE);
+        fill_rect(layer, &inner, VESSEL_RADIUS - 3, water, LV_OPA_80);
         layer->_clip_area = saved_clip;
         draw_line(layer, at(origin, VESSEL_X + 3, VESSEL_Y + 3 + (VESSEL_H - 6 - level)),
                   at(origin, VESSEL_X + VESSEL_W - 4, VESSEL_Y + 3 + (VESSEL_H - 6 - level)), 2,

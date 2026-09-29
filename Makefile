@@ -48,7 +48,9 @@ lint:
 		-D__ORDER_LITTLE_ENDIAN__=1234 -D__BYTE_ORDER__=1234 \
 		--suppress=missingIncludeSystem --inline-suppr -I sparrow/core \
 		-I examples/smart-boiler/generated -I examples/smart-boiler/controller \
-		sparrow/core examples/smart-boiler/controller examples/smart-boiler/generated
+		-I examples/smart-boiler/runtime -I sparrow/platform \
+		sparrow/core examples/smart-boiler/controller examples/smart-boiler/generated \
+		examples/smart-boiler/runtime
 	sparrow gen --check examples/smart-boiler/model/boiler.yaml
 	sparrow trace $(PROJECT) --check docs/traceability.md
 

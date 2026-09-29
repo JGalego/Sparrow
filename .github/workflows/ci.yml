@@ -45,6 +45,6 @@ jobs:
       - name: Install cross toolchain and qemu
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu qemu-user
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
       - name: Cross build, run C tests under qemu
         run: scripts/ci-cross.sh

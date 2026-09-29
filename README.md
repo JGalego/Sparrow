@@ -81,7 +81,7 @@ sparrow trace examples/smart-boiler/sparrow.yaml --requirement REQ-006
 
 ![](docs/assets/hmi-fault.png)
 
-**8. Deployment.** The same controller and HMI sources cross-compile for embedded Linux (`target-aarch64`, framebuffer and touchscreen). The reference target is NXP i.MX 8 class hardware, but no code depends on it.
+**8. Deployment.** On the target, `boiler_runtime` runs the same controller at a fixed 100 ms period, behind a hardware abstraction and a watchdog. The HMI runs on the framebuffer. Both cross-compile for aarch64 Linux (`target-aarch64`). The reference target is NXP i.MX 8 class hardware, but no code depends on it. `make run-sil` runs the runtime binary against the simulated plant on the desktop.
 
 ## Where AI fits in
 
@@ -115,15 +115,25 @@ AI is never part of the build, the tests, the simulator or the deployed control 
 
 ## Quick start
 
-Requirements: Linux, CMake 3.20+, a C11 compiler, Python 3.10+, SDL2 headers (`libsdl2-dev`) and Git. The first configure downloads LVGL v9.2.2.
+Requirements: Linux, CMake 3.20+, GCC or Clang with C++ (LVGL's build needs it), Python 3.10+, SDL2 headers (`libsdl2-dev`) and Git. The first configure downloads LVGL v9.2.2.
 
 ```sh
 make setup    # Python virtual environment with the sparrow tools
 make build    # controller, HMI and tests
 make run      # simulator + desktop HMI
-make test     # C unit tests, closed-loop tests, traceability with results
+make run-sil  # controller runtime binary + simulated plant + HMI
+make test     # C unit tests, closed-loop and SIL tests, traceability with results
 make lint     # ruff, clang-format, cppcheck, stale generated code and trace
 ```
+
+## Documentation
+
+- [Smart Boiler](docs/smart-boiler.md): state machine, faults, screens, plant model, scenarios
+- [Architecture](docs/architecture.md): components, data flow, frames, safety assumptions
+- [Testing](docs/testing.md): test layers, boundaries, sanitizers, cross-target tests
+- [Running and deploying](docs/deployment.md): simulator, software in the loop, embedded Linux
+- [AI assistance](docs/ai.md): configuration and use at each stage
+- [Traceability matrix](docs/traceability.md) and [decision records](docs/adr/)
 
 ## License
 

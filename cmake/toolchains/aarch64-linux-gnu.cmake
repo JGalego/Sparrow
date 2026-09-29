@@ -11,6 +11,8 @@ if(NOT SPARROW_TOOLCHAIN_PREFIX)
 endif()
 
 set(CMAKE_C_COMPILER ${SPARROW_TOOLCHAIN_PREFIX}gcc)
+# LVGL's CMake project enables C++ although the parts Sparrow builds are C.
+set(CMAKE_CXX_COMPILER ${SPARROW_TOOLCHAIN_PREFIX}g++)
 
 if(SPARROW_SYSROOT)
     set(CMAKE_SYSROOT ${SPARROW_SYSROOT})

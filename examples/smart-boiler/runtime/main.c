@@ -164,6 +164,7 @@ static int run(const Options *options, BoilerController *controller, BoilerIo io
     SpPeriod period;
     BoilerCommands pending = {0};
     bool io_ready = false; /* no control step before the first fresh inputs */
+    uint32_t kick_failures = 0;
     const uint64_t end_ns =
         options->run_s ? sp_monotonic_ns() + (uint64_t)options->run_s * 1000000000u : 0;
 
@@ -185,14 +186,16 @@ static int run(const Options *options, BoilerController *controller, BoilerIo io
         }
         io.write(io.context, &outputs);
         publish_status(hmi, controller);
-        sp_watchdog_kick(watchdog);
+        if (sp_watchdog_kick(watchdog) != SP_OK) {
+            kick_failures++;
+        }
     }
     {
         const BoilerOutputs safe = boiler_io_safe_outputs();
         io.write(io.context, &safe);
     }
-    fprintf(stderr, "stopped: %u overruns, %u stale input reads\n", (unsigned)period.overruns,
-            (unsigned)plant->stale_reads);
+    fprintf(stderr, "stopped: %u overruns, %u stale input reads, %u failed watchdog kicks\n",
+            (unsigned)period.overruns, (unsigned)plant->stale_reads, (unsigned)kick_failures);
     return 0;
 }
 
@@ -235,7 +238,9 @@ int main(int argc, char **argv)
     signal(SIGTERM, on_signal);
 
     result = run(&options, &controller, boiler_io_udp_interface(&plant), &hmi, &plant, &watchdog);
-    sp_watchdog_close(&watchdog);
+    if (sp_watchdog_close(&watchdog) != SP_OK) {
+        fprintf(stderr, "watchdog close failed; it remains armed\n");
+    }
     boiler_io_udp_close(&plant);
     sp_udp_close(&hmi.udp);
     return result;
