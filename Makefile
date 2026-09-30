@@ -7,6 +7,7 @@ PRESET ?= host
 BUILD_DIR := build/$(PRESET)
 SOURCES_C := $(shell git ls-files --cached --others --exclude-standard '*.c' '*.h' | grep -v '/generated/')
 PROJECT := examples/smart-boiler/sparrow.yaml
+GEAR := examples/landing-gear
 
 .PHONY: setup build test test-asan run run-sil lint format trace gen screenshots clean
 
@@ -23,7 +24,9 @@ test: build
 	SPARROW_BUILD_DIR=$(BUILD_DIR) pytest --junit-xml=$(BUILD_DIR)/results/python.xml
 	sparrow trace $(PROJECT) --results $(BUILD_DIR)/results/*.xml \
 		--write $(BUILD_DIR)/traceability.md
-	@echo "traceability with results: $(BUILD_DIR)/traceability.md"
+	sparrow trace $(GEAR)/sparrow.yaml --results $(BUILD_DIR)/results/*.xml \
+		--write $(BUILD_DIR)/landing-gear-traceability.md
+	@echo "traceability with results: $(BUILD_DIR)/traceability.md, $(BUILD_DIR)/landing-gear-traceability.md"
 
 # C tests under AddressSanitizer and UBSan. Python cannot load the
 # instrumented controller library, so the pytest suites are not run here.
@@ -51,8 +54,13 @@ lint:
 		-I examples/smart-boiler/runtime -I sparrow/platform \
 		sparrow/core examples/smart-boiler/controller examples/smart-boiler/generated \
 		examples/smart-boiler/runtime
+	cppcheck --quiet --error-exitcode=1 --enable=warning,portability \
+		--suppress=missingIncludeSystem --inline-suppr -I sparrow/core \
+		-I $(GEAR)/generated -I $(GEAR)/controller $(GEAR)/controller $(GEAR)/generated
 	sparrow gen --check examples/smart-boiler/model/boiler.yaml
+	sparrow gen --check $(GEAR)/model/gear.yaml
 	sparrow trace $(PROJECT) --check docs/traceability.md
+	sparrow trace $(GEAR)/sparrow.yaml --check $(GEAR)/traceability.md
 
 format:
 	ruff check --fix .
@@ -61,9 +69,11 @@ format:
 
 gen:
 	sparrow gen examples/smart-boiler/model/boiler.yaml
+	sparrow gen $(GEAR)/model/gear.yaml
 
 trace:
 	sparrow trace $(PROJECT) --write docs/traceability.md
+	sparrow trace $(GEAR)/sparrow.yaml --write $(GEAR)/traceability.md
 
 screenshots: build
 	scripts/capture-screenshots.py

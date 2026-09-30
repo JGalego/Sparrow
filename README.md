@@ -129,6 +129,7 @@ make lint     # ruff, clang-format, cppcheck, stale generated code and trace
 ## Documentation
 
 - [Smart Boiler](docs/smart-boiler.md): state machine, faults, screens, plant model, scenarios
+- [Landing gear](examples/landing-gear/README.md): a second example, built from requirements to tests with `sparrow ai`
 - [Architecture](docs/architecture.md): components, data flow, frames, safety assumptions
 - [Testing](docs/testing.md): test layers, boundaries, sanitizers, cross-target tests
 - [Running and deploying](docs/deployment.md): simulator, software in the loop, embedded Linux

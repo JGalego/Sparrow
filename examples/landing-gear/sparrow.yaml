@@ -1,0 +1,25 @@
+# Sparrow project descriptor. Paths are relative to this file.
+name: landing-gear
+model: model/gear.yaml
+requirements:
+  - requirements/*.yaml
+tests:
+  - tests/c
+  - tests/python
+
+# Optional AI assistance (`sparrow ai`), as in the Smart Boiler.
+ai:
+  paths:
+    requirements: [requirements/*.yaml]
+    model: [model/*.yaml]
+    code: [controller/*.c, controller/*.h]
+    tests: [tests/c/*.c, tests/c/*.h, tests/c/CMakeLists.txt, tests/python/*.py]
+    docs: [README.md]
+  protected:
+    - traceability.md
+  gates:
+    - make gen
+    - make format
+    - make trace
+    - make lint
+    - make test

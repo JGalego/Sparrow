@@ -1,0 +1,131 @@
+# Landing gear engineering model.
+#
+# A tricycle landing gear (nose, left main, right main) extended and retracted
+# by one hydraulic system, with gravity free-fall as the alternate extension.
+# `sparrow gen` turns this file into the C header/source and the Python
+# ctypes module listed under `outputs`.
+#
+# The structs below are the controller's wiring to the aircraft, fixed by the
+# installation. States, faults and most configuration come from the
+# requirements.
+
+application: landing-gear
+schema: 1
+prefix: Gear
+
+outputs:
+  c_header: ../generated/gear_model.h
+  c_source: ../generated/gear_model.c
+  python: ../landing_gear/model.py
+
+states:
+  - {name: INIT, label: Initializing}
+  # REQ-001: select operation from current lock inputs, not a prior position.
+  - {name: DOWN_LOCKED, label: Down and locked}
+  - {name: UP_LOCKED, label: Up and locked}
+  - {name: EXTENDING, label: Extending}
+  # Retraction selection does not imply that the interlock permits valve drive.
+  - {name: RETRACTING, label: Retraction selected}
+  - {name: ALTERNATE_EXTENDING, label: Alternate extension}
+  # REQ-007, REQ-008: a latched gear-disagree fault selects fault operation.
+  # FAULT does not inhibit lever-selected hydraulics, bypass the retraction
+  # interlock, or prevent alternate extension.
+  - {name: FAULT, label: Fault}
+
+# Bit positions in the alarm masks. `severity: critical` alarms force the
+# controller into its fault state; `warning` alarms only annunciate.
+faults:
+  # REQ-007: latch when an incomplete normal transit reaches its timeout.
+  # REQ-008: retain the latch and master warning until a nonzero reset request
+  # is accepted with exclusive lock indications agreeing with the lever
+  # (REQ-001). Agreement alone and mute do not clear the latch or its warning.
+  - {name: GEAR_DISAGREE, label: Gear disagree, text: "Normal hydraulic transit did not complete before its timeout", severity: critical, requirement: REQ-007}
+  # REQ-010: present only with both validity inputs nonzero, altitude and
+  # airspeed strictly below their configured warning thresholds, and gear
+  # not down and locked using the exclusive lock predicate of REQ-001.
+  # Equality or either invalid input makes the condition absent. Evaluate
+  # independently of lever position, alternate extension and gear disagree.
+  - {name: TOO_LOW_GEAR, label: Too low gear, text: "Valid low altitude and low airspeed with gear not down and locked", severity: warning, requirement: REQ-010}
+
+structs:
+  Inputs:
+    description: Discretes, air data and sensor signals sampled once per control step.
+    fields:
+      - {name: hydraulic_pressure_ma, type: f32, unit: mA, description: "Hydraulic system pressure transmitter, 4-20 mA"}
+      - {name: airspeed_kt, type: f32, unit: kt, description: "Indicated airspeed from the air data computer"}
+      - {name: radio_altitude_ft, type: f32, unit: ft, description: "Radio altitude above the terrain"}
+      - {name: airspeed_valid, type: u8, description: "1 when the air data computer reports normal operation"}
+      - {name: radio_altitude_valid, type: u8, description: "1 when the radio altimeter reports normal operation (0 above its range)"}
+      - {name: gear_handle_down, type: u8, description: "Gear lever: 1 down, 0 up"}
+      - {name: alternate_extend, type: u8, description: "1 while the alternate extension handle is pulled"}
+      - {name: nose_downlock, type: u8, description: "Nose gear down-and-locked proximity sensor"}
+      - {name: nose_uplock, type: u8, description: "Nose gear up-and-locked proximity sensor"}
+      - {name: left_downlock, type: u8, description: "Left main gear down-and-locked proximity sensor"}
+      - {name: left_uplock, type: u8, description: "Left main gear up-and-locked proximity sensor"}
+      - {name: right_downlock, type: u8, description: "Right main gear down-and-locked proximity sensor"}
+      - {name: right_uplock, type: u8, description: "Right main gear up-and-locked proximity sensor"}
+      - {name: left_wow, type: u8, description: "Left main gear weight-on-wheels (squat) switch"}
+      - {name: right_wow, type: u8, description: "Right main gear weight-on-wheels (squat) switch"}
+  Outputs:
+    description: Actuator and annunciator commands produced by every control step.
+    fields:
+      - {name: down_valve, type: u8, description: "1 energizes the gear-down selector valve"}
+      - {name: up_valve, type: u8, description: "1 energizes the gear-up selector valve"}
+      - {name: uplock_release, type: u8, description: "1 fires the alternate-extension uplock release"}
+      - {name: handle_lock, type: u8, description: "1 energizes the lever lock solenoid (lever held down)"}
+      - {name: gear_horn, type: u8, description: "1 sounds the gear warning horn whenever the REQ-010 condition is present unless a permitted episode-specific mute is in effect (REQ-011)"}
+      - {name: master_warning, type: u8, description: "1 lights the master warning; remains energized for latched gear disagree until an accepted reset, regardless of mute (REQ-008)"}
+  Commands:
+    description: >
+      Glareshield requests. Request fields are edge-triggered: the controller
+      acts on a non-zero value during the step that receives it.
+    fields:
+      # REQ-011: accept horn mute in the receiving step only with the REQ-010
+      # condition present and radio altitude strictly above horn_mute_min_altitude_ft.
+      # Retain it without repeated requests only while both conditions remain true;
+      # a request with no warning condition must not pre-mute a later episode.
+      - {name: mute, type: u8, description: "Nonzero requests permitted episode-specific gear-horn mute (REQ-011); does not clear gear disagree or extinguish its master warning (REQ-008)"}
+      - {name: reset, type: u8, description: "Nonzero requests fault reset; gear-disagree reset is accepted only when down and locked with lever down or up and locked with lever up using REQ-001 predicates; rejection leaves the latch unchanged (REQ-008)"}
+  Status:
+    description: Controller state published after every step.
+    fields:
+      - {name: alarms_active, type: u32, description: "Bit mask of alarms whose condition is present"}
+      - {name: alarms_latched, type: u32, description: "Bit mask of latched alarms"}
+      - {name: alarms_unacked, type: u32, description: "Bit mask of unacknowledged alarms"}
+      - {name: uptime_ms, type: u32, unit: ms, description: "Controller time since init"}
+      - {name: state_time_ms, type: u32, unit: ms, description: "Time in the current state"}
+      - {name: state, type: u8, description: "GearState"}
+
+frames:
+  - {name: STATUS, value: 1, struct: Status}
+  - {name: COMMANDS, value: 2, struct: Commands}
+
+# Controller configuration. Defaults are compiled in; min/max are enforced by
+# gear_config_check_ranges() before the controller starts.
+config:
+  # Hydraulic pressure transmitter (0 psi at 4 mA)
+  - {name: hydraulic_max_psi, default: 5000.0, min: 1000.0, max: 10000.0, unit: psi, description: "Pressure at 20 mA"}
+  # REQ-003: equality permits retraction; lower or invalid airspeed inhibits it.
+  # Proposed default and calibration range require aircraft-specific engineering review.
+  - {name: min_retraction_airspeed_kt, default: 80.0, min: 40.0, max: 200.0, unit: kt, description: "Minimum valid airspeed permitting retraction with both weight-on-wheels inputs zero"}
+  # REQ-007: completion takes precedence at the timeout boundary.
+  # Proposed default and calibration range require aircraft-specific engineering review.
+  - {name: normal_transit_timeout_ms, type: u32, default: 15000, min: 1000, max: 120000, unit: ms, description: "Elapsed normal hydraulic transit limit before latching gear disagree; includes interlock inhibition after drive begins, excludes alternate extension"}
+
+  # REQ-010: both valid measurements must be strictly below these limits;
+  # equality at either limit does not establish the warning condition.
+  # Defaults are required; proposed calibration ranges require aircraft-specific review.
+  - {name: gear_warning_altitude_ft, default: 500.0, min: 1.0, max: 2500.0, unit: ft, description: "Exclusive radio-altitude upper limit for the too-low gear warning condition"}
+  - {name: gear_warning_airspeed_kt, default: 190.0, min: 1.0, max: 400.0, unit: kt, description: "Exclusive airspeed upper limit for the too-low gear warning condition"}
+
+  # REQ-011: mute is permitted only strictly above this limit with warning present.
+  # Equality does not permit mute; persistence uses the same strict comparison.
+  # Default is required; proposed calibration range requires aircraft-specific review.
+  - {name: horn_mute_min_altitude_ft, default: 200.0, min: 0.0, max: 2500.0, unit: ft, description: "Exclusive radio-altitude lower limit for accepting and retaining an episode-specific gear-horn mute (REQ-011)"}
+
+# Faults the plant simulation can inject. Scenarios use these names.
+plant_faults:
+  - {name: HYD_PUMP_FAILED, label: Hydraulic pump failed}
+  - {name: NOSE_GEAR_JAMMED, label: Nose gear jammed}
+  - {name: WOW_STUCK_AIR, label: Weight-on-wheels switches stuck in air}
+  - {name: RADIO_ALTIMETER_FAILED, label: Radio altimeter failed}

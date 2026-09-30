@@ -1,0 +1,15 @@
+name: gear-not-down
+description: >
+  The crew forgets the gear. Below 500 ft the gear horn sounds ("too low,
+  gear"). They silence it at 460 ft, the horn returns below 200 ft, a second
+  mute does nothing, and the gear goes down at 160 ft, just in time.
+duration_s: 75
+plant:
+  initial_altitude_ft: 1000.0
+  initial_airspeed_kt: 150.0
+  vertical_speed_fpm: -900.0
+  gear_down: false
+events:
+  - {at_s: 36, action: command, fields: {mute: 1}}
+  - {at_s: 55, action: command, fields: {mute: 1}}
+  - {at_s: 56, action: command, fields: {gear_handle_down: 1}}

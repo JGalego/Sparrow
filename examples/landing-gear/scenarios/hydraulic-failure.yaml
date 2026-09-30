@@ -1,0 +1,19 @@
+name: hydraulic-failure
+description: >
+  The engine-driven hydraulic pump fails on approach at 2000 ft. The gear
+  lever is selected down but the gear stays locked up; the transit times
+  out and the master warning lights; MUTE does not put it out (REQ-008).
+  The crew pulls the alternate extension handle, the gear free-falls to
+  three green, and the reset they then press is accepted.
+duration_s: 70
+plant:
+  initial_altitude_ft: 2000.0
+  initial_airspeed_kt: 170.0
+  vertical_speed_fpm: -500.0
+  gear_down: false
+events:
+  - {at_s: 5, action: inject, fault: HYD_PUMP_FAILED}
+  - {at_s: 15, action: command, fields: {gear_handle_down: 1}}
+  - {at_s: 34, action: command, fields: {mute: 1}}
+  - {at_s: 40, action: command, fields: {alternate_extend: 1}}
+  - {at_s: 56, action: command, fields: {reset: 1}}

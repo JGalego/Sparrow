@@ -27,20 +27,29 @@ packages = [
     "sparrow.ai",
     "sparrow.ai.providers",
     "smart_boiler",
+    "landing_gear",
 ]
 
 [tool.setuptools.package-dir]
 smart_boiler = "examples/smart-boiler/smart_boiler"
+landing_gear = "examples/landing-gear/landing_gear"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/python", "examples/smart-boiler/tests/python"]
+testpaths = [
+    "tests/python",
+    "examples/smart-boiler/tests/python",
+    "examples/landing-gear/tests/python",
+]
 addopts = "-ra --strict-markers"
 markers = ["verifies(*requirements): the test verifies the listed requirement IDs"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["examples/smart-boiler/smart_boiler/model.py"]
+extend-exclude = [
+    "examples/smart-boiler/smart_boiler/model.py",
+    "examples/landing-gear/landing_gear/model.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

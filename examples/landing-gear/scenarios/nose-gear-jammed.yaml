@@ -1,0 +1,15 @@
+name: nose-gear-jammed
+description: >
+  The nose gear is jammed in its well. On gear down the mains lock but the
+  nose stays up, and the controller reports gear disagree. Alternate
+  extension does not free it; the crew is left with two green.
+duration_s: 50
+plant:
+  initial_altitude_ft: 2000.0
+  initial_airspeed_kt: 170.0
+  vertical_speed_fpm: -500.0
+  gear_down: false
+events:
+  - {at_s: 2, action: inject, fault: NOSE_GEAR_JAMMED}
+  - {at_s: 5, action: command, fields: {gear_handle_down: 1}}
+  - {at_s: 30, action: command, fields: {alternate_extend: 1}}

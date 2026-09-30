@@ -1,0 +1,13 @@
+name: takeoff
+description: >
+  Take-off roll from 100 kt, rotation at 140 kt. The crew calls "positive
+  rate, gear up" three seconds after liftoff and the gear retracts.
+duration_s: 35
+plant:
+  initial_airspeed_kt: 100.0
+  acceleration_kt_per_s: 3.0
+  rotate_kt: 140.0
+  climb_fpm: 2000.0
+events:
+  - {at_s: 17, action: command, fields: {gear_handle_down: 0}}
+  - {at_s: 17, action: command, fields: {acceleration_kt_per_s: 1.0}}

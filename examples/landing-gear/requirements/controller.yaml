@@ -1,0 +1,348 @@
+# Landing gear controller requirements. The tests that verify a requirement
+# declare it themselves (SP_TEST(..., "REQ-xxx") in C,
+# @pytest.mark.verifies("REQ-xxx") in Python); `sparrow trace` joins both sides.
+requirements:
+  - id: REQ-001
+    title: Initialize from sensed gear position
+    statement: >-
+      The controller shall start in INIT with both hydraulic selector valves
+      and the uplock release de-energized. On its first control step it shall
+      evaluate the current inputs and select operation without assuming a
+      previous gear position. All three downlock inputs asserted shall mean
+      down and locked; all three uplock inputs asserted shall mean up and
+      locked. Both predicates shall additionally require that none of the
+      opposite lock inputs is asserted. Every other sensor combination shall
+      mean neither fully down nor fully up. If the gear does not agree with
+      the lever, normal operation shall begin toward the lever subject to the
+      retraction interlock and alternate-extension priority.
+    rationale: >-
+      Startup can occur during transit. Contradictory lock indications must
+      not qualify as a completed transit or three greens.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_init
+      - controller/gear_controller.c::gear_down_locked
+      - controller/gear_controller.c::gear_up_locked
+      - controller/gear_controller.c::gear_retraction_permitted
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-002
+    title: Ground lever lock
+    statement: >-
+      The controller shall energize handle_lock whenever left_wow or right_wow
+      is nonzero and shall de-energize it when both are zero, independently of
+      the lever position, controller fault state, and alternate-extension input.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-003
+    title: Retraction interlock
+    statement: >-
+      The controller shall permit up_valve to be energized only when both
+      weight-on-wheels inputs are zero, airspeed_valid is nonzero, and
+      airspeed_kt is at least the configured minimum retraction airspeed.
+      Airspeed exactly at the minimum shall satisfy the speed interlock;
+      airspeed below it shall not. Loss of any permission shall de-energize
+      up_valve in the same control step. The interlock shall apply during
+      initialization, normal operation, and a latched gear-disagree fault.
+    rationale: >-
+      Ground loading and insufficient or unavailable airspeed must prevent
+      retraction even during fault recovery. The model task must add a minimum
+      retraction airspeed configuration parameter in kt; its default and range
+      require engineering selection.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - min_retraction_airspeed_kt
+    implementation:
+      - controller/gear_controller.c::gear_retraction_permitted
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-004
+    title: Normal extension and three greens
+    statement: >-
+      With alternate_extend zero and gear_handle_down nonzero, the controller
+      shall de-energize up_valve and energize down_valve until the gear is down
+      and locked as defined in REQ-001. At completion it shall de-energize
+      down_valve. Loss of the completed down-and-locked indication while the
+      lever remains down shall resume extension. Neither airspeed nor
+      weight-on-wheels shall inhibit extension.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_down_locked
+      - controller/gear_controller.c::gear_select_normal_extension
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-005
+    title: Normal retraction and immediate reversal
+    statement: >-
+      With alternate_extend zero and gear_handle_down zero, the controller
+      shall de-energize down_valve and energize up_valve, subject to REQ-003,
+      until the gear is up and locked as defined in REQ-001. At completion it
+      shall de-energize up_valve. Loss of the completed up-and-locked indication
+      while the lever remains up shall resume retraction subject to REQ-003.
+      If the lever goes down during retraction, the controller shall
+      de-energize up_valve and apply REQ-004 in that same control step.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_up_locked
+      - controller/gear_controller.c::gear_retraction_permitted
+      - controller/gear_controller.c::gear_select_normal_retraction
+      - controller/gear_controller.c::gear_select_normal_extension
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-006
+    title: Hydraulic selector exclusion
+    statement: >-
+      The controller shall never energize down_valve and up_valve
+      simultaneously, including during direction changes, initialization,
+      alternate extension, and fault handling.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_init
+      - controller/gear_controller.c::gear_set_hydraulic_selector
+      - controller/gear_controller.c::gear_select_normal_extension
+      - controller/gear_controller.c::gear_select_normal_retraction
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-007
+    title: Normal transit timeout
+    statement: >-
+      The controller shall start a normal transit timer when it first
+      energizes a hydraulic selector valve toward an incomplete lever-selected
+      position. If that position remains incomplete when elapsed transit time
+      reaches or exceeds the configured normal transit timeout, it shall assert
+      and latch a critical gear-disagree fault in that control step. It shall
+      not assert this fault before the timeout. Completion evaluated in the
+      step that reaches the timeout shall take precedence over timeout
+      detection. A lever direction change shall start a fresh transit timer
+      when drive in the new direction begins. Once started, the timer shall
+      continue through retraction-interlock inhibition. Alternate extension
+      shall cancel the normal transit timer; releasing alternate extension
+      shall allow a fresh normal transit timer to start.
+    rationale: >-
+      Interlock inhibition must not hide a transit that has already failed to
+      complete, while free-fall operation is not a hydraulic transit. The model
+      task must add a normal transit timeout configuration parameter in ms;
+      its default and range require engineering selection.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - normal_transit_timeout_ms
+    implementation:
+      - controller/gear_controller.c::gear_init
+      - controller/gear_controller.c::gear_update_normal_transit
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-008
+    title: Gear-disagree fault operation and reset
+    statement: >-
+      A latched gear-disagree fault shall place the controller in its fault
+      state and energize master_warning until an accepted reset. The fault
+      shall not stop lever-selected hydraulic operation under REQ-004 and
+      REQ-005, bypass REQ-003, or prevent alternate extension. The controller
+      shall accept a nonzero reset request for this fault only when the gear
+      is down and locked with the lever down, or up and locked with the lever
+      up, using the predicates in REQ-001. Agreement alone shall not clear the
+      latch. An accepted reset shall clear this fault and its master warning
+      and resume normal operation; a rejected reset shall leave the latch
+      unchanged. Mute shall not clear the latch or extinguish its master warning.
+    rationale: >-
+      Continued drive permits recovery of a slow transit; reset must not
+      conceal an unresolved lever-position disagreement.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_down_locked
+      - controller/gear_controller.c::gear_up_locked
+      - controller/gear_controller.c::gear_retraction_permitted
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_reset_disagree
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-009
+    title: Alternate extension priority
+    statement: >-
+      Whenever alternate_extend is nonzero, the controller shall energize
+      uplock_release and de-energize both hydraulic selector valves in the
+      same control step. This command shall persist while the handle is
+      pulled, regardless of lever position, hydraulic pressure, airspeed,
+      weight-on-wheels, lock indications, or a latched fault. When the handle
+      is released, the controller shall de-energize uplock_release and resume
+      lever-selected normal operation subject to the retraction interlock.
+      Alternate extension shall neither clear an existing gear-disagree latch
+      nor initiate a normal hydraulic transit timeout.
+    rationale: >-
+      Free-fall extension must not depend on hydraulic availability or oppose
+      an energized retraction valve. Ground lever locking remains applicable.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_set_hydraulic_selector
+      - controller/gear_controller.c::gear_select_alternate_extension
+      - controller/gear_controller.c::gear_select_operation
+      - controller/gear_controller.c::gear_update_normal_transit
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-010
+    title: Too-low gear warning condition
+    statement: >-
+      The controller shall establish the too-low gear warning condition if
+      and only if the warning is armed as defined in REQ-014,
+      radio_altitude_valid and airspeed_valid are both nonzero,
+      radio_altitude_ft is strictly below gear_warning_altitude_ft (default
+      500 ft), airspeed_kt is strictly below gear_warning_airspeed_kt (default
+      190 kt), and the gear is not down and locked as defined in REQ-001.
+      Equality at either threshold shall not establish the condition. The
+      condition shall be evaluated using the arming state updated in the
+      same control step, independently of lever position, alternate
+      extension, and a latched gear-disagree fault. If the warning is disarmed
+      or either validity input is zero, this condition shall be absent.
+    rationale: >-
+      Arming after the initial climb suppresses a nuisance horn during normal
+      take-off while retaining the warning on a subsequent approach with
+      forgotten gear. An out-of-range radio altimeter or invalid airspeed
+      must not be treated as a measured low-altitude, low-speed condition.
+      This does not specify separate sensor-failure annunciation. The warning
+      limits use the model's altitude and airspeed configuration parameters.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - gear_warning_altitude_ft
+      - gear_warning_airspeed_kt
+    implementation:
+      - controller/gear_controller.c::gear_down_locked
+      - controller/gear_controller.c::gear_update_warning_arming
+      - controller/gear_controller.c::gear_update_too_low_warning
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-011
+    title: Gear horn and permitted mute
+    statement: >-
+      The controller shall energize gear_horn whenever the REQ-010 warning
+      condition is present unless a permitted mute is in effect. A nonzero
+      mute request shall silence the horn in the same control step only if
+      the warning condition is present and radio_altitude_ft is strictly
+      greater than horn_mute_min_altitude_ft (default 200 ft). The mute shall
+      persist without repeated requests while that warning condition remains
+      present and altitude remains strictly greater than that configured limit.
+      A mute request when the warning condition is absent shall not pre-mute
+      a later warning.
+    rationale: >-
+      Muting is episode-specific rather than a permanent disable. The minimum
+      radio-altitude limit uses the model's horn-mute configuration parameter.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - horn_mute_min_altitude_ft
+    implementation:
+      - controller/gear_controller.c::gear_init
+      - controller/gear_controller.c::gear_update_horn
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-012
+    title: Unmutable warning at low altitude
+    statement: >-
+      When the REQ-010 warning condition is present and radio_altitude_ft is
+      at or below horn_mute_min_altitude_ft (default 200 ft), the controller
+      shall cancel any previous horn mute, reject a new horn mute, and
+      energize gear_horn in that same control step. A subsequent climb above
+      horn_mute_min_altitude_ft shall not restore the canceled mute; a new
+      permitted mute request shall be required.
+    rationale: >-
+      Equality at horn_mute_min_altitude_ft is conservatively assigned to the
+      unmutable region because mute is permitted only above the threshold.
+      This uses the same horn-mute configuration parameter as REQ-011.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - horn_mute_min_altitude_ft
+    implementation:
+      - controller/gear_controller.c::gear_update_horn
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-013
+    title: Gear warning termination and rearming
+    statement: >-
+      When the REQ-010 warning condition becomes absent, the controller shall
+      de-energize gear_horn and clear its horn-mute memory in that same control
+      step. A subsequent occurrence of the warning condition shall sound the
+      horn unless a new permitted mute request is received in that step.
+    rationale: >-
+      A mute from an earlier approach must not suppress a later warning episode.
+    component: controller
+    priority: must
+    verification: test
+    parameters: []
+    implementation:
+      - controller/gear_controller.c::gear_update_horn
+      - controller/gear_controller.c::gear_step
+
+  - id: REQ-014
+    title: Too-low gear warning arming after initial climb
+    statement: >-
+      The controller shall initialize the too-low gear warning disarmed.
+      Whenever left_wow or right_wow is nonzero, it shall disarm the warning
+      and clear its remembered altitude qualification in that same control
+      step. Ground disarming shall take precedence over altitude qualification.
+      With both weight-on-wheels inputs zero, the controller shall arm the
+      warning in the first control step in which radio_altitude_valid is
+      nonzero and radio_altitude_ft is at or above gear_warning_altitude_ft
+      (default 500 ft). A valid altitude strictly below that threshold, or
+      any altitude with radio_altitude_valid zero, shall not arm a disarmed
+      warning. Once armed, the warning shall remain armed until either
+      weight-on-wheels input becomes nonzero or the controller is initialized
+      again, including during descent below the threshold or loss of radio
+      altitude validity. Arming shall be independent of airspeed and its
+      validity, gear lock indications, lever position, alternate extension,
+      fault state, mute, and reset requests.
+    rationale: >-
+      Remembering a valid altitude at or above the existing warning threshold
+      since the last ground indication suppresses the normal take-off horn
+      without suppressing a subsequent low-altitude approach warning. Equality
+      qualifies for arming but does not satisfy the strictly-below warning
+      condition in REQ-010. Retaining arming through invalid radio altitude
+      allows warning evaluation to resume when valid measurements return.
+      Initialization has no prior flight history and therefore starts disarmed.
+      This uses existing inputs and configuration; no new parameter is needed.
+    component: controller
+    priority: must
+    verification: test
+    parameters:
+      - gear_warning_altitude_ft
+    implementation:
+      - controller/gear_controller.c::gear_init
+      - controller/gear_controller.c::gear_update_warning_arming
+      - controller/gear_controller.c::gear_update_too_low_warning
+      - controller/gear_controller.c::gear_step
+

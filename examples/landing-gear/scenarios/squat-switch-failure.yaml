@@ -1,0 +1,13 @@
+name: squat-switch-failure
+description: >
+  Taxiing at 20 kt. A gear-up selection on the ground is stopped by the lever
+  lock. Then both squat switches fail to "air", which releases the lever
+  lock, and the lever is bumped up. The airspeed interlock alone keeps the
+  gear down.
+duration_s: 15
+plant:
+  initial_airspeed_kt: 20.0
+events:
+  - {at_s: 3, action: command, fields: {gear_handle_down: 0}}
+  - {at_s: 6, action: inject, fault: WOW_STUCK_AIR}
+  - {at_s: 8, action: command, fields: {gear_handle_down: 0}}
