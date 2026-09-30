@@ -69,3 +69,13 @@ def test_recorded_boiler_trace_can_be_summarized(tmp_path):
     assert "STARTUP -> RUNNING" in summary
     assert "alarms_latched + NO_FLOW" in summary
     assert "RUNNING -> FAULT" in summary
+
+
+def test_state_changes_without_a_temperature_column_carry_no_detail(tmp_path):
+    path = tmp_path / "trace.csv"
+    write_trace(path, [{"time_s": 0, "state": 0}, {"time_s": 1, "state": 2}])
+
+    summary = summarize_trace(path, STATES, FAULTS)
+
+    assert "1.0 s  state INIT -> RUNNING\n" in summary + "\n"
+    assert "nan" not in summary

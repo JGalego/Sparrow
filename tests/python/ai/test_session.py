@@ -1,5 +1,6 @@
 """The task runner end to end with a scripted provider, on a small throwaway project."""
 
+import dataclasses
 import json
 import subprocess
 import textwrap
@@ -87,6 +88,7 @@ def test_code_task_context_holds_the_requirement_implementation_and_tests(projec
     assert "file app/src/limit.c (implements it)" in titles
     assert "file app/tests/test_limit.c (verifies it)" in titles
     assert "app/src/*.c" in user
+    assert "Implementation paths are relative to app/" in user
 
 
 def test_requirement_tasks_see_the_file_that_defines_the_requirement(project):
@@ -302,3 +304,114 @@ def test_explain_with_all_tests_passing_is_refused(project):
 
     with pytest.raises(TaskError, match="all tests passed"):
         run_task(project, TASKS["explain"], "results.xml", {}, CONFIG, ScriptedProvider())
+
+
+def test_a_proposal_that_breaks_a_requirement_file_is_rejected(project):
+    bad = proposal(
+        {
+            "path": "app/requirements/main.yaml",
+            "action": "replace",
+            "search": "priority: must",
+            "replace": "priority: urgent",
+            "content": "",
+        }
+    )
+    provider = ScriptedProvider(bad, bad)
+
+    with pytest.raises(ProposalError, match="invalid requirements: REQ-001: priority"):
+        run_task(project, TASKS["requirements"], "idea", {}, CONFIG, provider)
+    assert "priority: must" in (project.repo / "app/requirements/main.yaml").read_text()
+
+
+def test_a_proposal_that_breaks_the_model_is_rejected(project):
+    import dataclasses
+
+    model = project.project.root / "model.yaml"
+    model.write_text(
+        textwrap.dedent("""\
+        application: app
+        schema: 1
+        prefix: App
+        outputs: {c_header: gen/app.h, c_source: gen/app.c, python: gen/app.py}
+        states: [{name: IDLE, label: Idle}]
+        faults: []
+        structs: {}
+        frames: []
+        config: [{name: limit, default: 10.0, min: 0.0, max: 20.0}]
+        plant_faults: []
+        """)
+    )
+    ai = dataclasses.replace(
+        project,
+        project=dataclasses.replace(project.project, model=model),
+        paths={**project.paths, "model": ("app/model.yaml",)},
+    )
+    bad = proposal(
+        {
+            "path": "app/model.yaml",
+            "action": "replace",
+            "search": "\nfaults: []",
+            "replace": "\nfaults: [{name: HOT, label: Hot, severity: critical}]",
+            "content": "",
+        }
+    )
+    provider = ScriptedProvider(bad, bad)
+
+    with pytest.raises(ProposalError, match=r"invalid model: fault HOT lacks \['text'\]"):
+        run_task(ai, TASKS["model"], "REQ-001", {}, CONFIG, provider)
+    assert list(model.parent.glob("tmp*.yaml")) == []
+
+
+def test_tests_task_is_asked_to_repair_failing_tests_that_cite_the_requirement(project):
+    results = project.repo / "build/host/results/test_limit.xml"
+    results.parent.mkdir(parents=True)
+    results.write_text(
+        '<testsuite><testcase classname="test_limit" name="stops_above">'
+        '<failure message="expected 1, got 0"/></testcase></testsuite>'
+    )
+
+    user, context = build_request(project, TASKS["tests"], "REQ-001", {}, CONFIG)
+
+    assert "test_limit::stops_above\nexpected 1, got 0" in dict(context.sections)["failing tests"]
+    assert "correct it in place" in user
+
+
+def test_tests_task_without_failures_is_not_asked_to_repair(project):
+    user, context = build_request(project, TASKS["tests"], "REQ-001", {}, CONFIG)
+
+    assert "failing tests" not in dict(context.sections)
+    assert "correct it in place" not in user
+
+
+def test_failures_older_than_their_test_file_are_not_sent_for_repair(project):
+    import os
+
+    results = project.repo / "build/host/results/test_limit.xml"
+    results.parent.mkdir(parents=True)
+    results.write_text(
+        '<testsuite><testcase classname="test_limit" name="stops_above">'
+        '<failure message="expected 1, got 0"/></testcase></testsuite>'
+    )
+    test_file = project.repo / "app/tests/test_limit.c"
+    ran_at = results.stat().st_mtime
+    os.utime(test_file, (ran_at + 10, ran_at + 10))
+
+    user, context = build_request(project, TASKS["tests"], "REQ-001", {}, CONFIG)
+
+    assert "failing tests" not in dict(context.sections)
+
+
+def test_tests_task_sees_the_project_modules_the_fixtures_import(project):
+    (project.repo / "app/bench").mkdir()
+    (project.repo / "app/bench/rig.py").write_text("class Rig: ...\n")
+    (project.repo / "app/tests/conftest.py").write_text(
+        "import pytest\nfrom bench.rig import Rig\nfrom os.path import join\n"
+    )
+    project = dataclasses.replace(
+        project, paths={**project.paths, "tests": (*project.paths["tests"], "app/tests/*.py")}
+    )
+
+    _, context = build_request(project, TASKS["tests"], "REQ-001", {}, CONFIG)
+
+    titles = [t for t, _ in context.sections]
+    assert "file app/bench/rig.py (imported by conftest.py, the closed-loop test API)" in titles

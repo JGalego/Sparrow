@@ -83,11 +83,18 @@ def _parse_requirement(item: dict, source: Path) -> Requirement:
     return requirement
 
 
+def parse_requirements(raw: dict, source: Path) -> list[Requirement]:
+    """The requirements of one parsed requirement file."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("requirements"), list):
+        raise ProjectError(f"{source.name}: needs a 'requirements' list")
+    return [_parse_requirement(item, source) for item in raw["requirements"]]
+
+
 def load_requirements(project: Project) -> list[Requirement]:
     requirements: list[Requirement] = []
     for path in project.requirement_files:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-        requirements += [_parse_requirement(item, path) for item in raw["requirements"]]
+        requirements += parse_requirements(raw, path)
     ids = [r.id for r in requirements]
     duplicates = sorted({i for i in ids if ids.count(i) > 1})
     if duplicates:

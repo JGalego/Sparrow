@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
+from ..codegen.model import ModelError, load_model
+from ..requirements.schema import ProjectError, parse_requirements
 from .config import AIConfig
 from .gates import GateResult, run_gates
 from .project import AIProject
@@ -44,6 +49,31 @@ class Outcome:
     @property
     def gates_passed(self) -> bool:
         return all(g.passed for g in self.gates)
+
+
+def check_documents(ai: AIProject, changes: dict[Path, tuple[str, str]]) -> None:
+    """Rejects a proposal that would leave the model or a requirement file unloadable.
+
+    The model is loaded from a temporary copy next to the original, so that
+    its relative output paths resolve the same way.
+    """
+    for path, (_, new) in changes.items():
+        name = ai.relative(path)
+        if ai.project.model is not None and path == ai.project.model.resolve():
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".yaml", dir=path.parent, encoding="utf-8"
+            ) as copy:
+                copy.write(new)
+                copy.flush()
+                try:
+                    load_model(Path(copy.name))
+                except ModelError as error:
+                    raise ProposalError(f"{name}: invalid model: {error}") from None
+        elif path in {p.resolve() for p in ai.project.requirement_files}:
+            try:
+                parse_requirements(yaml.safe_load(new), path)
+            except (ProjectError, yaml.YAMLError, KeyError, TypeError) as error:
+                raise ProposalError(f"{name}: invalid requirements: {error}") from None
 
 
 def build_request(ai: AIProject, task: Task, argument: str, options: dict, config: AIConfig):
@@ -105,6 +135,7 @@ def run_task(
                 return Outcome(task.name, text, saved, notes=notes, usage=usage)
             proposal = parse_proposal(completion.text)
             changes = resolve(proposal, ai.repo, _policy(ai, task))
+            check_documents(ai, changes)
             break
         except ProposalError as error:
             if attempt == attempts:

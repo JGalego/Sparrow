@@ -1,4 +1,6 @@
 import ctypes
+import shutil
+import subprocess
 import textwrap
 
 import pytest
@@ -109,9 +111,39 @@ def test_generated_python_matches_the_c_layout(tmp_path):
         (("{name: WARM", "{name: HOT"), "duplicate fault"),
         (("severity: warning", "severity: minor"), "unknown severity"),
         (("schema: 1", "schema: 2"), "schema version"),
+        (("structs:\n", "structs: []\nunused:\n"), "structs must be a mapping"),
+        (("config:\n", "config: []\nunused:\n"), "at least one config parameter"),
         (("{name: RUN, label: Run}", "{name: ON, label: On}"), "quote the name"),
     ],
 )
 def test_invalid_models_are_rejected(tmp_path, change, message):
     with pytest.raises(ModelError, match=message):
         load_model(write_model(tmp_path, MODEL.replace(*change)))
+
+
+@pytest.mark.skipif(shutil.which("cc") is None, reason="needs a C compiler")
+def test_a_model_without_faults_generates_valid_c_and_python(tmp_path):
+    faultless = MODEL.replace(
+        MODEL[MODEL.index("faults:") : MODEL.index("structs:")], "faults: []\n"
+    )
+    path = write_model(tmp_path, faultless)
+    generate(path)
+
+    result = subprocess.run(
+        ["cc", "-std=c11", "-pedantic-errors", "-Wall", "-fsyntax-only", "gen/demo.c"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    namespace: dict = {}
+    exec((tmp_path / "gen" / "demo.py").read_text(), namespace)
+    assert namespace["FAULT_INFO"] == {}
+    assert "#define DEMO_CRITICAL_FAULT_MASK (UINT32_C(0))" in (tmp_path / "gen/demo.h").read_text()
+
+
+def test_a_missing_key_is_reported_with_its_entry(tmp_path):
+    with pytest.raises(ModelError, match=r"fault WARM lacks \['text'\]"):
+        load_model(write_model(tmp_path, MODEL.replace("text: Warm", "label: Warm")))

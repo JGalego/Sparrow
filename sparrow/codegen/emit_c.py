@@ -51,10 +51,13 @@ def _config_struct(model: Model) -> str:
 def header(model: Model) -> str:
     p = model.prefix
     guard = f"{_upper(p)}_MODEL_H"
-    critical = " | ".join(
-        f"{_upper(p)}_FAULT_BIT({_upper(p)}_FAULT_{f.name})"
-        for f in model.faults
-        if f.severity == "critical"
+    critical = (
+        " | ".join(
+            f"{_upper(p)}_FAULT_BIT({_upper(p)}_FAULT_{f.name})"
+            for f in model.faults
+            if f.severity == "critical"
+        )
+        or "UINT32_C(0)"
     )
     out = [BANNER.format(source=model.source.name), f"#ifndef {guard}", f"#define {guard}", ""]
     out += ["#include <stdint.h>", ""]
@@ -133,17 +136,16 @@ def source(model: Model) -> str:
     out = [BANNER.format(source=model.source.name), f'#include "{model.outputs["c_header"].name}"']
     out += ["", "#include <stddef.h>", "#include <string.h>", ""]
 
-    out.append(f"static const {p}FaultInfo fault_table[{up}_FAULT_COUNT] = {{")
-    for f in model.faults:
-        out.append(f'    {{"{f.name}", "{f.text}", {up}_SEVERITY_{f.severity.upper()}}},')
-    out += ["};", ""]
-    out += [
-        f"const {p}FaultInfo *{lp}_fault_info({p}Fault fault)",
-        "{",
-        f"    return fault < {up}_FAULT_COUNT ? &fault_table[fault] : NULL;",
-        "}",
-        "",
-    ]
+    if model.faults:
+        out.append(f"static const {p}FaultInfo fault_table[{up}_FAULT_COUNT] = {{")
+        for f in model.faults:
+            out.append(f'    {{"{f.name}", "{f.text}", {up}_SEVERITY_{f.severity.upper()}}},')
+        out += ["};", ""]
+        lookup = f"    return fault < {up}_FAULT_COUNT ? &fault_table[fault] : NULL;"
+    else:
+        # C has no empty arrays; a model without faults yet has nothing to look up.
+        lookup = "    (void)fault;\n    return NULL;"
+    out += [f"const {p}FaultInfo *{lp}_fault_info({p}Fault fault)", "{", lookup, "}", ""]
 
     out.append(f"static const char *const state_labels[{up}_STATE_COUNT] = {{")
     out += [f'    "{s.label}",' for s in model.states]

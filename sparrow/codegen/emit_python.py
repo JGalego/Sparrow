@@ -43,7 +43,7 @@ def source(model: Model) -> str:
     out += ["", "", "STATE_LABELS = {"]
     out += [f'    State.{s.name}: "{s.label}",' for s in model.states]
     out += ["}", "", "", "class Fault(IntEnum):"]
-    out += [f"    {f.name} = {i}" for i, f in enumerate(model.faults)]
+    out += [f"    {f.name} = {i}" for i, f in enumerate(model.faults)] or ["    pass"]
     out += [
         "",
         "",

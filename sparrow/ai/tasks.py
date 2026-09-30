@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 from collections.abc import Callable
@@ -15,6 +16,8 @@ from ..requirements.trace import Trace, build_trace
 from .analysis import summarize_trace
 from .context import Context
 from .project import AIProject
+
+RESULTS_GLOB = "build/host/results/*.xml"
 
 
 class TaskError(Exception):
@@ -122,7 +125,9 @@ def build_code(ai, trace, context, requirement_id, options) -> str:
     return (
         f"Implement {requirement_id} in the controller. Keep the controller deterministic: "
         "no clock, no allocation, no global state, time only from dt_ms. Update the "
-        "requirement's implementation list with path::symbol references to what you add."
+        "requirement's implementation list with path::symbol references to what you add. "
+        f"Implementation paths are relative to {ai.relative(ai.project.root) or '.'}/, the "
+        "directory of the project descriptor, not to the repository root."
     )
 
 
@@ -132,23 +137,67 @@ def build_code(ai, trace, context, requirement_id, options) -> str:
 def build_tests(ai, trace, context, requirement_id, options) -> str:
     _add_requirement_with_links(ai, trace, context, requirement_id)
     context.add_files(
-        [p for p in ai.files("tests") if p.name in ("boiler_fixture.h", "conftest.py")],
+        [p for p in ai.files("tests") if p.name.endswith("_fixture.h") or p.name == "conftest.py"],
         "test fixtures",
     )
     context.add_files([p for p in ai.files("tests") if p.name == "CMakeLists.txt"], "test build")
+    context.add_files(_fixture_imports(ai), "imported by conftest.py, the closed-loop test API")
     _add_generated_headers(ai, context)
+    generated_python = [p for p in ai.protected_paths() if p.suffix == ".py"]
+    context.add_files(generated_python, "generated, read-only")
     harness = ai.repo / "sparrow" / "testing" / "sp_test.h"
     context.add_file(harness, "C test harness")
-    return (
+    failing = _failing_tests_for(ai, trace, requirement_id)
+    repair = ""
+    if failing:
+        context.add("failing tests", "\n\n".join(f"{key}\n{message}" for key, message in failing))
+        repair = (
+            f"Some existing tests that cite {requirement_id} fail in the last results (listed "
+            "under 'failing tests'). Where a test is wrong for the current requirements, "
+            "correct it in place instead of adding a replacement. Do not change a test to pass "
+            "if the failure shows a controller defect; say so in the rationale. "
+        )
+    return repair + (
         f"Write tests that verify {requirement_id}. Test each limit it names just below, at "
         "and just above the limit, and the failure behaviour, not only the normal case: the "
         "condition must be shown to raise its alarm as well as not to. Add C unit tests for "
         "controller logic and pytest closed-loop tests where the plant's dynamics matter. "
         "Every new test must cite the requirement. Test through the public interface, as the "
-        "existing tests do (the fixture and boiler_step); never #include a .c file or call a "
+        "existing tests do (the fixture and the controller's step function); never #include a "
+        ".c file or call a "
         "static function. Register every new C test file in the test CMakeLists.txt with "
         "sparrow_add_c_test. Do not duplicate existing tests shown in the context."
     )
+
+
+def _fixture_imports(ai: AIProject) -> list[Path]:
+    """The project's own Python modules that the pytest fixtures import (bench, plant)."""
+    found: set[Path] = set()
+    for conftest in (p for p in ai.files("tests") if p.name == "conftest.py"):
+        for node in ast.walk(ast.parse(conftest.read_text("utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                module = ai.project.root / (node.module.replace(".", "/") + ".py")
+                if module.is_file():
+                    found.add(module.resolve())
+    return sorted(found)
+
+
+def _failing_tests_for(ai, trace, requirement_id: str) -> list[tuple[str, str]]:
+    """Failures in the last JUnit results of tests that cite the requirement.
+
+    A result older than its test file is stale (the test changed after it ran)
+    and is left out, so the model is not asked to repair a test that is fixed.
+    """
+    citing = {t.key: t.path for t in trace.tests_for(requirement_id)}
+    failures = []
+    for results in sorted(ai.repo.glob(RESULTS_GLOB)):
+        ran_at = results.stat().st_mtime
+        for name, message in _failed_cases([results]):
+            classname, _, case = name.partition("::")
+            key = f"{classname.rsplit('.', 1)[-1]}::{case.split('[')[0]}"
+            if key in citing and citing[key].stat().st_mtime <= ran_at:
+                failures.append((key, message))
+    return failures
 
 
 # HMI and documentation
@@ -224,7 +273,7 @@ def _failed_cases(paths: list[Path]) -> list[tuple[str, str]]:
 
 
 def build_explain(ai, trace, context, results_glob, options) -> str:
-    paths = sorted(ai.repo.glob(results_glob or "build/host/results/*.xml"))
+    paths = sorted(ai.repo.glob(results_glob or RESULTS_GLOB))
     if not paths:
         raise TaskError(f"no JUnit results match {results_glob}; run `make test` first")
     failures = _failed_cases(paths)
@@ -250,7 +299,7 @@ def build_explain(ai, trace, context, results_glob, options) -> str:
 def build_analyze(ai, trace, context, csv_path, options) -> str:
     path = Path(csv_path)
     if not path.is_file():
-        raise TaskError(f"{csv_path}: not found; record one with `python -m smart_boiler --csv`")
+        raise TaskError(f"{csv_path}: not found; record one with the simulator's --csv option")
     model = yaml.safe_load(ai.project.model.read_text("utf-8"))
     states = [s["name"] for s in model["states"]]
     faults = [f["name"] for f in model["faults"]]

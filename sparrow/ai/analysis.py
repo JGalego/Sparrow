@@ -31,9 +31,11 @@ def summarize_trace(path: Path, states: list[str], faults: list[str]) -> str:
     lines.append(f"  {previous['time_s']:.1f} s  state {states[int(previous['state'])]}")
     for row in rows[1:]:
         if row["state"] != previous["state"]:
+            # The boiler's temperature is the context that matters at a state change.
+            detail = f" (T = {row['temperature_c']:.1f})" if "temperature_c" in row else ""
             lines.append(
                 f"  {row['time_s']:.1f} s  state {states[int(previous['state'])]} -> "
-                f"{states[int(row['state'])]} (T = {row.get('temperature_c', float('nan')):.1f})"
+                f"{states[int(row['state'])]}{detail}"
             )
         for column in ("alarms_active", "alarms_latched"):
             if column in row and row[column] != previous[column]:

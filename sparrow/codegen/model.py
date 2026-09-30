@@ -136,8 +136,39 @@ def _parse_param(item: dict) -> Param:
     return param
 
 
+def _keys(kind: str, items: list, required: tuple[str, ...]) -> list:
+    """Checks that every entry of a model list has the required keys."""
+    _require(isinstance(items, list), f"{kind}s must be a list")
+    for item in items:
+        _require(isinstance(item, dict), f"{kind} entry {item!r} is not a mapping")
+        missing = [key for key in required if key not in item]
+        _require(not missing, f"{kind} {item.get('name', '?')} lacks {missing}")
+    return items
+
+
 def load_model(path: Path) -> Model:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        raise ModelError(f"{path.name} is not valid YAML: {error}") from None
+    _require(isinstance(raw, dict), f"{path.name} is not a mapping")
+    missing = [
+        key
+        for key in ("application", "prefix", "outputs", "states", "faults", "structs")
+        + ("frames", "config", "plant_faults")
+        if key not in raw
+    ]
+    _require(not missing, f"{path.name} lacks {missing}")
+    for key in ("outputs", "structs"):
+        _require(isinstance(raw[key], dict), f"{key} must be a mapping")
+    _keys("state", raw["states"], ("name", "label"))
+    _keys("fault", raw["faults"], ("name", "severity", "text"))
+    _keys("frame", raw["frames"], ("name", "value", "struct"))
+    _keys("config parameter", raw["config"], ("name", "default", "min", "max"))
+    _keys("plant fault", raw["plant_faults"], ("name", "label"))
+    for name, body in raw["structs"].items():
+        _require(isinstance(body, dict) and "fields" in body, f"struct {name} lacks its fields")
+        _keys(f"{name} field", body["fields"], ("name", "type"))
     _require(raw.get("schema") == 1, "unsupported model schema version")
     base = path.parent
     model = Model(
@@ -167,6 +198,9 @@ def _validate(model: Model) -> None:
     _unique_names("plant fault", [f.name for f in model.plant_faults])
     _unique_names("frame", [f.name for f in model.frames])
     _require(len(model.faults) <= 32, "at most 32 faults fit the alarm masks")
+    # C has no empty arrays or structs.
+    _require(bool(model.states), "the model needs at least one state")
+    _require(bool(model.config), "the model needs at least one config parameter")
     for fault in model.faults:
         _require(fault.severity in SEVERITIES, f"fault {fault.name}: unknown severity")
     struct_names = {s.name for s in model.structs}
